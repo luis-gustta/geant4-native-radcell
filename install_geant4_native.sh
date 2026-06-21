@@ -261,7 +261,7 @@ download_source() {
   local top
   top="$(tar -tf "$tarball" | awk -F/ 'NR==1{print $1}')"
   [[ -n "$top" ]] || fatal "could not inspect source archive"
-  rm -rf "$src_root/$top"
+  rm -rf "${src_root:?}/${top:?}"
   tar -xzf "$tarball" -C "$src_root"
   SRC_DIR="$src_root/$top"
   [[ -f "$SRC_DIR/CMakeLists.txt" ]] || fatal "source extraction failed: $SRC_DIR"
@@ -396,9 +396,10 @@ extract_dataset_tarball() {
   top="$(tar -tzf "$tarball" | awk -F/ 'NR==1{print $1}')"
   [[ -n "$top" ]] || fatal "could not inspect dataset archive: $tarball"
   if mkdir -p "$target_dir" 2>/dev/null && [[ -w "$target_dir" ]]; then
-    rm -rf "$target_dir/$top"; tar -xzf "$tarball" -C "$target_dir"
+    rm -rf "${target_dir:?}/${top:?}"
+    tar -xzf "$tarball" -C "${target_dir:?}"
   else
-    sudo mkdir -p "$target_dir"; sudo rm -rf "$target_dir/$top"; sudo tar -xzf "$tarball" -C "$target_dir"
+    sudo mkdir -p "$target_dir"; sudo rm -rf "${target_dir:?}/${top:?}"; sudo tar -xzf "$tarball" -C "${target_dir:?}"
   fi
 }
 
