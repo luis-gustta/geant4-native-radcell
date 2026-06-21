@@ -1,0 +1,19 @@
+# Build artifacts
+*.deb
+*.deb.sha256
+*.tar.gz
+*.log
+
+# Local release packages
+packages/
+dist/
+
+# Build roots
+.cache/
+build/
+stage/
+
+# Editors
+.vscode/
+.idea/
+*~
