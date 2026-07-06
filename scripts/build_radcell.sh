@@ -73,6 +73,7 @@ echo "[Build] Jobs:"
 echo "  $JOBS"
 echo
 
+# shellcheck source=/dev/null
 source "$GEANT4_SH"
 
 PY_INC="$("$PYTHON_BIN" -c 'import sysconfig; print(sysconfig.get_paths()["include"])')"

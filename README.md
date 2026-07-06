@@ -101,7 +101,10 @@ Use this path when you need to isolate a specific failure such as patch applicat
   - helper script to create a GitHub release and upload the `.deb` as a release asset.
 
 - `docs/radcell_installation_v0.md`
-  - initial end-to-end RADCELL installation manual.
+  - end-to-end RADCELL installation workflow.
+
+- `docs/radcell_first_run.md`
+  - first-run validation guide after installation, including `import radcell`, direct `RADCellSimulation.py`, CompuCell3D GUI launch, and expected terminal output.
 
 - `docs/`
   - motivation, validation, release, and RADCELL-remake strategy notes.
