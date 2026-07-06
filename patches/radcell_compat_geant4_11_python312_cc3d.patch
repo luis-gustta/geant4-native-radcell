@@ -295,3 +295,57 @@ index f2bb00d..9492e3c 100755
              }
              
              G4RunDoseAnalysis runDoseAnalysis;
+diff --git a/VascularTumor/Simulation/RADCellSimulation.py b/VascularTumor/Simulation/RADCellSimulation.py
+index 1c0a20f..d5884aa 100644
+--- a/VascularTumor/Simulation/RADCellSimulation.py
++++ b/VascularTumor/Simulation/RADCellSimulation.py
+@@ -5,11 +5,11 @@ import itertools
+ 
+ from collections import OrderedDict
+ 
+-print 'Start calling subprocess RADCellSimulation here'
+-print 'The directory now is: ', os.getcwd()
++print('Start calling subprocess RADCellSimulation here')
++print('The directory now is: ', os.getcwd())
+ cellInformationPath = os.getcwd() +"/cellInformation.csv"
+-print 'the cellInformationPath now is ', cellInformationPath
+-print 'check files is: ',os.path.isfile(cellInformationPath)
++print('the cellInformationPath now is ', cellInformationPath)
++print('check files is: ',os.path.isfile(cellInformationPath))
+ 
+ try:
+     ifile = open(cellInformationPath,"r")
+@@ -34,7 +34,7 @@ except IOError:
+ sim=radcell.RADCellSimulation()
+ 
+ sim.SetCellWorld(dX,dY,dZ) # change unit here in mm
+-print 'the dimension of tissue is ',dX, dY, dZ
++print('the dimension of tissue is ',dX, dY, dZ)
+ 
+ # cell color and nucleus color could be as :
+ # Gray, Grey, Black, Green, Red, Blue, Magenta, Yellow
+@@ -53,7 +53,7 @@ sim.CreateCell(cellType_list[3],"Cytoplasma Nucleus","Sphere","Yellow Green")
+ sim.SetCellSimulationParameter(1,"Nucleus")
+ 
+ 
+-for key, value in cellInfoDict.items():
++for key, value in list(cellInfoDict.items()):
+     sim.CellConstruction(int(key),cellType_list[value[3]-1],value[0],value[1],value[2],10,5)
+ 
+ 
+@@ -71,12 +71,12 @@ for key, value in cellInfoDict.items():
+ #         sim.CellConstruction(int(key),"Epithelia2",cell_x,cell_y,cell_z,2,1)
+     
+     
+-print 'Before starting calling radiation energy deposition caclculation function \n'
++print('Before starting calling radiation energy deposition caclculation function \n')
+ 
+ 
+-sim.RADCellSimulationInitializePyWrapper(len(sys.argv), sys.argv)
++sim.RADCellSimulationInitializePyWrapper(1, [sys.argv[0]])
+ 
+-print 'the argument is ', sys.argv
++print('the argument is ', sys.argv)
+ 
+ runMode=sys.argv[1]
+ radiationSource = sys.argv[2]+".in"
