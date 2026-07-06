@@ -182,8 +182,8 @@ expand_path() {
   fi
 
   case "$p" in
-    "~") echo "$HOME" ;;
-    "~/"*) echo "$HOME/${p#~/}" ;;
+    \~) echo "$HOME" ;;
+    \~/*) echo "$HOME/${p#~/}" ;;
     *) echo "$p" ;;
   esac
 }
@@ -280,7 +280,7 @@ spinner_run() {
   set +e
   "$@" >"$logfile" 2>&1 &
   local pid=$!
-  local frames='|/-\'
+  local frames="|/-\\"
   local i=0
 
   while kill -0 "$pid" >/dev/null 2>&1; do
