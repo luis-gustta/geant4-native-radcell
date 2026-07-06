@@ -1,0 +1,297 @@
+diff --git a/RADCellSimulation/CMakeLists.txt b/RADCellSimulation/CMakeLists.txt
+index 0202bc5..3d402c9 100755
+--- a/RADCellSimulation/CMakeLists.txt
++++ b/RADCellSimulation/CMakeLists.txt
+@@ -1,6 +1,6 @@
+ #----------------------------------------------------------------------------
+ # Setup the project
+-cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.5)
+ project(RADCellSimulation)
+ 
+ #----------------------------------------------------------------------------
+@@ -42,7 +42,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+ endif()
+ 
+-add_library(radcelllib SHARED ${sources}) # creating a libarary for radcell ,changed here 
++add_library(radcelllib SHARED ${sources})
++target_link_libraries(radcelllib ${Geant4_LIBRARIES} ${PYTHON_LIBRARIES}) # creating a libarary for radcell ,changed here 
+ find_package(PythonLibs REQUIRED) #find python libs for calling python function in C++
+ include_directories(${PYTHON_INCLUDE_DIRS})
+ 
+diff --git a/RADCellSimulation/include/Analysis.hh b/RADCellSimulation/include/Analysis.hh
+index 12f0f39..596e8ed 100755
+--- a/RADCellSimulation/include/Analysis.hh
++++ b/RADCellSimulation/include/Analysis.hh
+@@ -12,6 +12,6 @@
+ #ifndef Analysis_h
+ #define Analysis_h 1
+ 
+-#include "g4root.hh"
++#include "G4AnalysisManager.hh"
+ 
+ #endif
+diff --git a/RADCellSimulation/include/RADCellSimulation.hh b/RADCellSimulation/include/RADCellSimulation.hh
+index 6c6238e..a2f1ba3 100755
+--- a/RADCellSimulation/include/RADCellSimulation.hh
++++ b/RADCellSimulation/include/RADCellSimulation.hh
+@@ -4,15 +4,9 @@
+ // December 10,2015
+ // This is a class for running the radiation transportation in cells
+ 
+-#ifdef G4MULTITHREADED
+-#include "G4MTRunManager.hh"
+-#else
+ #include "G4RunManager.hh"
+-#endif
+ #include "DetectorConstruction.hh"
+ #include "G4UImanager.hh"
+-#include "G4VisExecutive.hh"
+-#include "G4UIExecutive.hh"
+ #include "G4Types.hh"
+ #include <string>
+ 
+@@ -39,14 +33,10 @@ class RADCellSimulation
+       private:
+       
+       DetectorConstruction* detector;
+-      G4VisManager* visManager;
+-        #ifdef G4MULTITHREADED
+-        G4MTRunManager* runManager;
+-        #else
++      void* visManager;
+         G4RunManager* runManager;
+-        #endif
+       G4UImanager* UImanager;
+-      G4UIExecutive* ui; 
++      void* ui; 
+ 
+       
+       
+diff --git a/RADCellSimulation/python_wrapper/CMakeLists.txt b/RADCellSimulation/python_wrapper/CMakeLists.txt
+index 792a05b..9dbfc5c 100755
+--- a/RADCellSimulation/python_wrapper/CMakeLists.txt
++++ b/RADCellSimulation/python_wrapper/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ # I don't really know why these two lines are needed!
+-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
++cmake_minimum_required(VERSION 3.5)
+ PROJECT(PYINTERFACE)
+ 
+ #include(${CMAKE_CURRENT_SOURCE_DIR}/FindSWIG.cmake) # this is slightly modified FindSWIG.cmake file -  had to tune it to work with OSX
+@@ -25,48 +25,7 @@ ENDIF(SWIG_FOUND)
+ #       OUTPUT_VARIABLE NUMPY_INCLUDE_DIR)
+ 
+ 
+-SET(LIBS
+-   radcelllib   
+-   G4vis_management
+-   G4digits_hits 
+-   G4geometry 
+-   G4GMocren 
+-   G4materials
+-   G4particles 
+-   G4RayTracer
+-   G4track 
+-   G4visXXX
+-   G4error_propagation
+-   G4geomUSolids
+-   G4graphics_reps  
+-   G4modeling   
+-   G4persistency   
+-   G4readout    
+-   G4Tree            
+-   G4VRML
+-   G4analysis  
+-   G4event              
+-   G4gl2ps        
+-   G4intercoms      
+-   G4OpenGL     
+-   G4physicslists  
+-   G4run        
+-   G4visHepRep       
+-   G4zlib
+-   G4clhep     
+-   G4FR                 
+-   G4global       
+-   G4interfaces     
+-   G4parmodels  
+-   G4processes     
+-   G4tracking   
+-   G4vis_management
+-   pthread
+-   ${PYTHON_LIBRARIES}
+-
+-)
+-
+-
++SET(LIBS radcelllib ${Geant4_LIBRARIES} ${PYTHON_LIBRARIES} pthread)
+ INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_PATH} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
+  
+ SET_SOURCE_FILES_PROPERTIES(radcell.i PROPERTIES CPLUSPLUS ON)
+diff --git a/RADCellSimulation/src/DataProcessUsingPython.cc b/RADCellSimulation/src/DataProcessUsingPython.cc
+index 0e71245..28d7b7e 100755
+--- a/RADCellSimulation/src/DataProcessUsingPython.cc
++++ b/RADCellSimulation/src/DataProcessUsingPython.cc
+@@ -17,7 +17,7 @@ void DataProcessUsingPython::PlotCellSurvivalCurve(string fileName, string color
+     vec_str.push_back("plotCellSF");
+     vec_str.push_back("plotSFCurve");
+ 
+-    vec_str.push_back(fileName.c_str()); // the input argument for PyString_FromString is const char*, so use this line
++    vec_str.push_back(fileName.c_str()); // the input argument for PyUnicode_FromString is const char*, so use this line
+     vec_str.push_back(color.c_str());
+ //     vec_str.push_back("'cellState.csv'");
+ //     vec_str.push_back("'b'");
+@@ -42,7 +42,7 @@ void DataProcessUsingPython::PlotCellSurvivalCurve(string fileName, string color
+     }
+ 
+     Py_Initialize();
+-    pName = PyString_FromString(argv1[1]);
++    pName = PyUnicode_FromString(argv1[1]);
+     /* Error checking of pName left out */
+ 
+     pModule = PyImport_Import(pName);
+@@ -55,8 +55,8 @@ void DataProcessUsingPython::PlotCellSurvivalCurve(string fileName, string color
+         if (pFunc && PyCallable_Check(pFunc)) {
+             pArgs = PyTuple_New(argc - 3);
+             for (i = 0; i < argc - 3; ++i) {
+-//                 pValue = PyString_FromString(atoi(argv1[i + 3]));// if need number argument, use this line
+-                pValue = PyString_FromString((argv1[i + 3])); // if need string argument, use this line
++//                 pValue = PyUnicode_FromString(atoi(argv1[i + 3]));// if need number argument, use this line
++                pValue = PyUnicode_FromString((argv1[i + 3])); // if need string argument, use this line
+                 if (!pValue) {
+                     Py_DECREF(pArgs);
+                     Py_DECREF(pModule);
+@@ -68,7 +68,7 @@ void DataProcessUsingPython::PlotCellSurvivalCurve(string fileName, string color
+             pValue = PyObject_CallObject(pFunc, pArgs);
+             Py_DECREF(pArgs);
+             if (pValue != NULL) {
+-                printf("Result of call: %ld\n", PyInt_AsLong(pValue));
++                printf("Result of call: %ld\n", PyLong_AsLong(pValue));
+                 Py_DECREF(pValue);
+             }
+             else {
+diff --git a/RADCellSimulation/src/PhysicsList.cc b/RADCellSimulation/src/PhysicsList.cc
+index 26f68a5..a3f2dc5 100755
+--- a/RADCellSimulation/src/PhysicsList.cc
++++ b/RADCellSimulation/src/PhysicsList.cc
+@@ -139,12 +139,13 @@ void PhysicsList::ConstructProcess()
+ void PhysicsList::ConstructEM()
+ {
+ 
+-  theParticleIterator->reset();
++  auto particleIterator = GetParticleIterator();
++  particleIterator->reset();
+ 
+-  while( (*theParticleIterator)() )
++  while( (*particleIterator)() )
+   {
+ 
+-    G4ParticleDefinition* particle = theParticleIterator->value();
++    G4ParticleDefinition* particle = particleIterator->value();
+     G4ProcessManager* pmanager = particle->GetProcessManager();
+     G4String particleName = particle->GetParticleName();
+ 
+diff --git a/RADCellSimulation/src/RADCellSimulation.cc b/RADCellSimulation/src/RADCellSimulation.cc
+index 6ecbb71..12edcee 100755
+--- a/RADCellSimulation/src/RADCellSimulation.cc
++++ b/RADCellSimulation/src/RADCellSimulation.cc
+@@ -5,13 +5,8 @@
+ 
+ #include "RADCellSimulation.hh"
+ #include "G4UImanager.hh"
+-#include "G4UIExecutive.hh"
+-#include "G4UIterminal.hh"
+-#include "G4UItcsh.hh"
+-#include "G4VisExecutive.hh"
+ #include "ActionInitialization.hh"
+ #include "PhysicsList.hh"
+-#include "G4UIQt.hh"
+ #include "G4SystemOfUnits.hh"
+ #include "G4String.hh"
+ #include "G4GeometryManager.hh"
+@@ -30,15 +25,18 @@ using namespace std;
+ RADCellSimulation::RADCellSimulation()
+ {
+     detector = new DetectorConstruction();
++    runManager = nullptr;
++    visManager = nullptr;
++    ui = nullptr;
++    UImanager = nullptr;
+ }
+ 
+ 
+ RADCellSimulation::~RADCellSimulation()
+ {
+-    delete visManager;
+-    delete runManager;
+-    delete ui;
+-
++    // Intentionally empty.
++    // Geant4 owns global/singleton state and Python/SWIG shutdown order is unsafe here.
++    // Do not delete runManager, detector, visManager or ui from the Python wrapper destructor.
+ }
+ 
+ 
+@@ -101,9 +99,8 @@ void RADCellSimulation::RADCellSimulationInitialize(int argc, char** argv)
+ 
+ 
+   #ifdef G4MULTITHREADED
+-   // G4MTRunManager* runManager = new G4MTRunManager;
+-    runManager= new G4MTRunManager;
+-    runManager->SetNumberOfThreads(4);// set up the number of number of threads for multithread simulation
++   // G4MTRunManager* runManager = new G4RunManager;
++    runManager= new G4RunManager;// set up the number of number of threads for multithread simulation
+   #else
+    // G4RunManager* runManager = new G4RunManager;
+     runManager= new G4RunManager;
+@@ -124,11 +121,9 @@ void RADCellSimulation::RADCellSimulationInitialize(int argc, char** argv)
+   
+     runManager->Initialize();
+  
+-  // Initialize visualization 
+-  visManager = new G4VisExecutive;
+-
+-  visManager->Initialize();  // comment this if you want to run radcell in CC3D
+-  ui = new G4UIExecutive(argc, argv); // 
++  // Initialize visualization
++    visManager = nullptr;  // comment this if you want to run radcell in CC3D
++    ui = nullptr; // 
+   UImanager = G4UImanager::GetUIpointer();  // Get the pointer to the User Interface manager
+   UImanager->ApplyCommand("/control/execute vis.mac");
+ 
+@@ -174,15 +169,11 @@ void RADCellSimulation::EnergyDistributionCalculation(string runArgument,string
+     ArgumentInterpreter::SetPostProcessMarker(postProMarker);
+     
+     
+-    if (argument_vector[0]=="gui")// running in gui interactive mode 
+-    {
+-          // Define UI terminal for interactive mode  
+-        //G4UIExecutive* ui = new G4UIExecutive(argc, argv);
+-        
+-        UImanager->ApplyCommand(runCommand);
+-        ui->SessionStart(); 
+-       // delete ui;
+-    }
++    if (argument_vector[0]=="gui")
++  {
++    G4cerr << "RADCELL was compiled in headless mode; GUI mode is disabled. Use runArgument=\"out\"." << G4endl;
++    UImanager->ApplyCommand(runCommand);
++  }
+     if (argument_vector[0]=="out")// running in output file mode
+     { 
+         UImanager->ApplyCommand(runCommand);
+diff --git a/RADCellSimulation/src/RunAction.cc b/RADCellSimulation/src/RunAction.cc
+index f2bb00d..9492e3c 100755
+--- a/RADCellSimulation/src/RunAction.cc
++++ b/RADCellSimulation/src/RunAction.cc
+@@ -349,7 +349,7 @@ void RunAction::EndWorker(const G4Run* run)
+                     ///////////////
+                     // Complete cleanup
+                     //
+-                    delete G4AnalysisManager::Instance();
++                    G4AnalysisManager::Instance()->Reset();
+             }
+             
+             G4RunDoseAnalysis runDoseAnalysis;
