@@ -258,6 +258,12 @@ Recommended starting points:
 - `docs/radcell_installation_v0.md`
   - end-to-end RADCELL installation workflow.
 
+- `docs/radcell_first_run.md`
+  - first-run validation guide after installation.
+
+- `examples/radcell_minimal/README.md`
+  - minimal RADCELL runtime validation example using the patched VascularTumor workflow.
+
 - `THIRD_PARTY_NOTICES.md`
   - third-party license and attribution notes.
 
