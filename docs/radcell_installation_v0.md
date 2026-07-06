@@ -27,19 +27,67 @@ This guide covers:
 8. Testing the RADCELL Python module.
 9. Running `RADCellSimulation.py` directly.
 10. Opening `VascularTumor.cc3d` in the CompuCell3D Player.
+11. Troubleshooting common errors.
 
 ## Expected layout
 
 The default paths used by this guide are:
 
 - Geant4: `/opt/geant4/11.4.2`
-- RADCELL source: `~/working_on/radcell/RADCELL`
+- RADCELL source: `~/radcell/RADCELL`
 - RADCELL install prefix: `~/.local/radcell`
 - CompuCell3D: `~/CompuCell3D`
 - CompuCell3D Python: `~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python`
 - RADCELL launcher: `~/run_radcell_cc3d_python.sh`
 
 Other paths can be used, but the commands must be adjusted accordingly.
+
+---
+
+## Quick automated setup
+
+If CompuCell3D is already installed, the recommended setup path is:
+
+```bash
+./scripts/setup_radcell_stack.sh
+```
+
+Running the script with no arguments starts an interactive installer-like workflow. It will:
+
+- search for an existing local RADCELL source tree;
+- ask whether to use an existing RADCELL source tree if one is found;
+- suggest `~/radcell` as the default parent directory if a new clone is needed;
+- detect the CompuCell3D Python interpreter when possible;
+- check for native Geant4;
+- offer to install Geant4 using this repository if it is missing;
+- apply or verify the compatibility patch;
+- build and install RADCELL;
+- create the launcher;
+- test `import radcell`;
+- save logs under `/tmp/radcell-stack-setup/<timestamp>/`.
+
+For a non-interactive setup:
+
+```bash
+./scripts/setup_radcell_stack.sh \
+  --workdir ~/radcell \
+  --cc3d-python ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python \
+  --yes
+```
+
+`--workdir` is the parent directory where the original RADCELL repository will be cloned or found. With:
+
+```bash
+--workdir ~/radcell
+```
+
+the script expects or creates:
+
+```text
+~/radcell/RADCELL
+```
+
+The rest of this document describes the manual/debug path step by step.
 
 ---
 
@@ -163,8 +211,8 @@ ls /opt/geant4/11.4.2/lib/libG4global.so
 Choose a working directory:
 
 ```bash
-mkdir -p ~/working_on/radcell
-cd ~/working_on/radcell
+mkdir -p ~/radcell
+cd ~/radcell
 ```
 
 Clone the original RADCELL repository:
@@ -195,15 +243,13 @@ RADCELL/VascularTumor
 From inside the `geant4-native-radcell` repository:
 
 ```bash
-cd ~/working_on/radcell/geant4-native-radcell
+cd /path/to/geant4-native-radcell
 ```
-
-If this repository is elsewhere, use the correct path.
 
 Apply the patch:
 
 ```bash
-./scripts/apply_radcell_patch.sh ~/working_on/radcell/RADCELL
+./scripts/apply_radcell_patch.sh ~/radcell/RADCELL
 ```
 
 Expected successful output:
@@ -228,14 +274,14 @@ That is also acceptable.
 From inside the `geant4-native-radcell` repository:
 
 ```bash
-./scripts/build_radcell.sh ~/working_on/radcell/RADCELL
+./scripts/build_radcell.sh ~/radcell/RADCELL
 ```
 
 If CompuCell3D Python is not at the default location, pass it explicitly:
 
 ```bash
 ./scripts/build_radcell.sh \
-  ~/working_on/radcell/RADCELL \
+  ~/radcell/RADCELL \
   /path/to/CompuCell3D/miniforge3/envs/cc3d_env/bin/python
 ```
 
@@ -327,7 +373,7 @@ echo "${LD_PRELOAD:-}"
 Go to the VascularTumor simulation directory:
 
 ```bash
-cd ~/working_on/radcell/RADCELL/VascularTumor/Simulation
+cd ~/radcell/RADCELL/VascularTumor/Simulation
 ```
 
 Run:
@@ -358,7 +404,7 @@ Warnings about Geant4 production cuts may appear and are not necessarily fatal.
 Start the CompuCell3D Player through the launcher:
 
 ```bash
-cd ~/working_on/radcell/RADCELL
+cd ~/radcell/RADCELL
 
 ~/run_radcell_cc3d_python.sh \
   ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/cc3d-player5
@@ -367,7 +413,7 @@ cd ~/working_on/radcell/RADCELL
 Inside the CompuCell3D Player, open:
 
 ```text
-~/working_on/radcell/RADCELL/VascularTumor/VascularTumor.cc3d
+~/radcell/RADCELL/VascularTumor/VascularTumor.cc3d
 ```
 
 Press **Run**.
@@ -390,7 +436,7 @@ For server or SSH use:
 
 ```bash
 ~/run_radcell_cc3d_python.sh -m cc3d.run_script \
-  -i ~/working_on/radcell/RADCELL/VascularTumor/VascularTumor.cc3d \
+  -i ~/radcell/RADCELL/VascularTumor/VascularTumor.cc3d \
   --output-dir ~/radcell_cc3d_outputs/VascularTumor_test
 ```
 
@@ -513,21 +559,14 @@ Then run from this repository:
 ## 14. Minimal command summary
 
 ```bash
-# Install Geant4 from this repository
+# Recommended automated path
+./scripts/setup_radcell_stack.sh
+
+# Manual/debug path
 ./install_geant4_native.sh
-
-# Clone RADCELL
 git clone https://github.com/forgetsummer/RADCELL.git
-
-# Patch RADCELL
 ./scripts/apply_radcell_patch.sh /path/to/RADCELL
-
-# Build RADCELL
 ./scripts/build_radcell.sh /path/to/RADCELL
-
-# Create launcher
 ./scripts/create_radcell_launcher.sh
-
-# Test
 ~/run_radcell_cc3d_python.sh -c "import radcell; print(radcell)"
 ```
