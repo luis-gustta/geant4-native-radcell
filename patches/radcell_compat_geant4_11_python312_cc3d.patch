@@ -246,7 +246,7 @@ index 6ecbb71..12edcee 100755
    #else
     // G4RunManager* runManager = new G4RunManager;
      runManager= new G4RunManager;
-@@ -124,11 +121,9 @@ void RADCellSimulation::RADCellSimulationInitialize(int argc, char** argv)
+@@ -124,11 +121,11 @@ void RADCellSimulation::RADCellSimulationInitialize(int argc, char** argv)
    
      runManager->Initialize();
   
@@ -259,9 +259,12 @@ index 6ecbb71..12edcee 100755
 +    visManager = nullptr;  // comment this if you want to run radcell in CC3D
 +    ui = nullptr; // 
    UImanager = G4UImanager::GetUIpointer();  // Get the pointer to the User Interface manager
-   UImanager->ApplyCommand("/control/execute vis.mac");
+-  UImanager->ApplyCommand("/control/execute vis.mac");
++  // Do not execute vis.mac during initialization.
++  // RADCELL is launched headlessly from CompuCell3D in modern workflows.
++  // UImanager->ApplyCommand("/control/execute vis.mac");
  
-@@ -174,15 +169,11 @@ void RADCellSimulation::EnergyDistributionCalculation(string runArgument,string
+@@ -174,15 +171,11 @@ void RADCellSimulation::EnergyDistributionCalculation(string runArgument,string
      ArgumentInterpreter::SetPostProcessMarker(postProMarker);
      
      

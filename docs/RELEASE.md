@@ -1,5 +1,22 @@
 # GitHub Repository and Release Procedure
 
+## v0.4.1 — Clean headless RADCELL execution
+
+This maintenance release cleans up the headless RADCELL/Geant4 execution path used by the modern CompuCell3D workflow.
+
+Main changes:
+
+- prevents `RADCellSimulationInitialize()` from executing `vis.mac` automatically;
+- removes the unwanted `/vis/open OGL` attempt in headless `out` runs;
+- extends `scripts/verify_radcell_compat.sh` to check the C++ headless compatibility changes;
+- updates `scripts/setup_radcell_stack.sh` version to `0.4.1`.
+
+Validation performed locally:
+
+- patched clean RADCELL checkout builds successfully;
+- isolated launcher imports `radcell` successfully;
+- headless `RADCellSimulation.py "out test_cc3d" testInputSource` starts Geant4 event processing without the previous `/vis/open OGL` command error.
+
 ## v0.4.0 — Modernized CompuCell3D VascularTumor workflow
 
 This release adds the modern CompuCell3D-compatible RADCELL VascularTumor workflow.
