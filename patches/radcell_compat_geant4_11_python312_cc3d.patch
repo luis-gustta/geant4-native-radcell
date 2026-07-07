@@ -349,3 +349,339 @@ index 1c0a20f..d5884aa 100644
  
  runMode=sys.argv[1]
  radiationSource = sys.argv[2]+".in"
+diff --git a/VascularTumor/Simulation/RadiationTransportModule.py b/VascularTumor/Simulation/RadiationTransportModule.py
+index da536bf..6026eac 100644
+--- a/VascularTumor/Simulation/RadiationTransportModule.py
++++ b/VascularTumor/Simulation/RadiationTransportModule.py
+@@ -1,6 +1,6 @@
+ 
+-from PySteppables import *
+-import CompuCell
++from cc3d.core.PySteppables import SteppableBasePy
++from cc3d.cpp import CompuCell
+ import sys
+ import os
+ from scipy import interpolate
+@@ -32,7 +32,7 @@ class WriteCellInformation():
+         writer = csv.writer(ofile)
+         writer.writerow([dX,dY,dZ])
+         
+-        for key, value in self.cellDict.items():
++        for key, value in list(self.cellDict.items()):
+             cell_x=value[0]*self.DCF/TDF-dX/2.0  # this is changing coordinate system between CC3D and Geant4
+             cell_y=value[1]*self.DCF/TDF-dY/2.0
+             cell_z=value[2]*self.DCF/TDF-dZ/2.0
+@@ -59,7 +59,7 @@ class RadiationTransport(SteppableBasePy):
+         writeCellInfo = WriteCellInformation(dim,cellInfoDict,self.DCF) 
+         cellInformationPath = os.path.dirname(__file__) +"/cellInformation.csv"
+         writeCellInfo.Write(cellInformationPath)
+-        child = subprocess.Popen(["python","RADCellSimulation.py",runMode,radiationSource],cwd=os.path.dirname(__file__))#check the geometry and radiation source
++        child = subprocess.Popen([sys.executable, "-u", "RADCellSimulation.py", runMode, radiationSource], cwd=os.path.dirname(__file__)) # check the geometry and radiation source
+         child.wait()
+ 
+ class RadiationSource(SteppableBasePy):
+@@ -165,7 +165,7 @@ class CellSimulationResult():
+             self.readResult.ReadDNADamageTallyOutPut(os.path.dirname(__file__)+"/"+str(self.fileName)+"_DNADamage.csv") # read normalized cell DSB file
+             singleCellDoseFileName = self.singleCellFileName+"_dose.csv"
+             singleCellDSBFileName = self.singleCellFileName+"_DNADamage.csv"
+-            print 'single cell file name is ', singleCellDoseFileName, singleCellDSBFileName 
++            print('single cell file name is ', singleCellDoseFileName, singleCellDSBFileName) 
+             self.readResult.ReadSingleCellDoseAsReference(os.path.dirname(__file__)+"/"+singleCellDoseFileName)
+             self.readResult.ReadSingleCellDNADamageAsReference(os.path.dirname(__file__)+"/"+singleCellDSBFileName)
+             self.readResult.GetAbsoluteResultsByCOIMethod(prescribed_dose, "indirect","mean")
+diff --git a/VascularTumor/Simulation/VascularTumor.py b/VascularTumor/Simulation/VascularTumor.py
+index 007feb6..6d0cf6e 100644
+--- a/VascularTumor/Simulation/VascularTumor.py
++++ b/VascularTumor/Simulation/VascularTumor.py
+@@ -1,30 +1,14 @@
++import os
+ import sys
+-from os import environ
+-import string
+-sys.path.append(environ["PYTHON_MODULE_PATH"])
+ 
++sys.path.append(os.path.dirname(__file__))
+ 
+-
+-import CompuCellSetup
+-sim,simthread = CompuCellSetup.getCoreSimulationObjects()
+-CompuCellSetup.initializeSimulationObjects(sim,simthread)
+-import CompuCell
+-
+-#Create extra player fields here or add attributes
+-
+-
+-from PySteppables import SteppableRegistry
+-steppableRegistry=SteppableRegistry()
+-
++from cc3d import CompuCellSetup
+ 
+ from VascularTumorSteppables import MitosisSteppable
+-mitosisSteppable=MitosisSteppable(sim,1)
+-steppableRegistry.registerSteppable(mitosisSteppable)
+-
+ from VascularTumorSteppables import VolumeParamSteppable
+-                                         #sim,frequency,areaThresh,nutrientThresh,necroticThresh
+-volumeParamSteppable=VolumeParamSteppable(sim,1)
+-steppableRegistry.registerSteppable(volumeParamSteppable)
+ 
+-CompuCellSetup.mainLoop(sim,simthread,steppableRegistry)
++CompuCellSetup.register_steppable(steppable=MitosisSteppable(frequency=1))
++CompuCellSetup.register_steppable(steppable=VolumeParamSteppable(frequency=1))
+ 
++CompuCellSetup.run()
+diff --git a/VascularTumor/Simulation/VascularTumorSteppables.py b/VascularTumor/Simulation/VascularTumorSteppables.py
+index 78be2d9..8e97daf 100644
+--- a/VascularTumor/Simulation/VascularTumorSteppables.py
++++ b/VascularTumor/Simulation/VascularTumorSteppables.py
+@@ -1,6 +1,6 @@
+-from PySteppables import *
+-from PySteppablesExamples import MitosisSteppableBase
+-import CompuCell
++from cc3d.core.PySteppables import *
++from cc3d.core.PySteppables import MitosisSteppableBase
++from cc3d.cpp import CompuCell
+ import sys
+ from random import uniform
+ import math
+@@ -11,11 +11,11 @@ import scipy.stats as stats
+ import os
+ 
+ class VolumeParamSteppable(SteppableBasePy):
+-    def __init__(self,_simulator,_frequency=1,):
+-        SteppableBasePy.__init__(self,_simulator,_frequency)
++    def __init__(self, frequency=1):
++        SteppableBasePy.__init__(self, frequency)
+         self.fieldNameVEGF2 = 'VEGF2'
+         self.fieldNameGlucose = 'Glucose'
+-        self.numberOfTumorCellList = []  
++        self.numberOfTumorCellList = []
+         self.numberOfVascularCellList = []
+         self.numberOfNeovascularCellList = []
+         self.numberOfNecroticCellList = []
+@@ -39,25 +39,25 @@ class VolumeParamSteppable(SteppableBasePy):
+             else:
+                 cell.targetVolume=32.0
+                 cell.lambdaVolume=20.0
+-                
++
+         DCF = 10
+         dX = self.dim.x*DCF/float(1000) #change unit into mm
+         dY = self.dim.y*DCF/float(1000)
+         dZ = self.dim.z*DCF/float(1000)
+-       
++
+ 
+         radSource = RTM.RadiationSource('testInputSource')
+ #         radSource.PlaneSource_MRT(0,0,dZ/2.0,dX/2.0,dY/20.0,'e-',1000,0)
+         radSource.PlaneSource(0,0,dZ/2.0,dX/2.0,dY/20.0,'e-',1000,1000)
+         radTransport = RTM.RadiationTransport(self.dim,self.cellList,DCF)# importing tissue and cell geometry from CC3D
+-#         radTransport.Run("gui",radSource.GetSourceID()) # check geometry and radiation source 
+-        
++#         radTransport.Run("gui",radSource.GetSourceID()) # check geometry and radiation source
++
+ 
+ 
+     def step(self,mcs):
+         fieldVEGF2=CompuCell.getConcentrationField(self.simulator,self.fieldNameVEGF2)
+         fieldGlucose=CompuCell.getConcentrationField(self.simulator,self.fieldNameGlucose)
+-        
++
+ #         if mcs == 10:
+ #         if mcs == 5000:
+ #         if mcs == 7000:
+@@ -71,21 +71,21 @@ class VolumeParamSteppable(SteppableBasePy):
+             dX = self.dim.x*DCF/float(1000) #change unit into mm
+             dY = self.dim.y*DCF/float(1000)
+             dZ = self.dim.z*DCF/float(1000)
+-           
++
+ 
+ #             radSource = RTM.RadiationSource('testInputSource')
+ #             radSource.PlaneSource(0,0,dZ/4.0,dX/100.0,dY/100.0,'e-',1000,0)
+ 
+ #             radTransport = RTM.RadiationTransport(self.dim,self.cellList,DCF)# importing tissue and cell geometry from CC3D
+-#             radTransport.Run("gui",radSource.GetSourceID()) # check geometry and radiation source 
+-            
++#             radTransport.Run("gui",radSource.GetSourceID()) # check geometry and radiation source
++
+             radSource = RTM.RadiationSource('testInputSource')
+             radSource.PlaneSource_MRT(0,0,dZ/2.0,dX/2.0,dY/20.0,'e-',1000,1000)
+ #             radSource.PlaneSource(0,0,dZ/2.0,dX/2.0,dY/20.0,'e-',1000,500)
+             radTransport = RTM.RadiationTransport(self.dim,self.cellList,DCF)# importing tissue and cell geometry from CC3D
+-            runMode = 'gui'+' ' + self.simulationID
+-            print 'the runMode is: ', runMode
+-#             radTransport.Run("gui",radSource.GetSourceID()) # check geometry and radiation source 
++            runMode = 'out'+' ' + self.simulationID
++            print('the runMode is: ', runMode)
++#             radTransport.Run("gui",radSource.GetSourceID()) # check geometry and radiation source
+ #             radSource.PlaneSource(0,0,dZ/2.0,dX/2.0,dY/20.0,'e-',1000,5000)
+             radTransport.Run(runMode,radSource.GetSourceID()) # check geometry and radiation source
+             simResult = RTM.CellSimulationResult(self.simulationID)
+@@ -98,25 +98,25 @@ class VolumeParamSteppable(SteppableBasePy):
+                 E1 = 0 # mean state energy of S1 state
+                 E3= 48.47 # mean state energy of S2 state
+                 sigma = 6.96 # sigma of state energy distribution
+-                
++
+                 cellDose, cellDSB, normalized_dose,normalized_DSB= simResult.GetCellDose(cell.id)
+ #                 print 'The dose for cell: ',cell.id, ' is: ',cellDose
+ #                 print 'The DSB for cell: ', cell.id, 'is: ' , cellDSB
+ #                 print 'The normalized dose for cell: ', cell.id, 'is: ', normalized_dose
+ #                 print 'The normalized DSB for cell: ', cell.id, 'is: ', normalized_DSB
+-                
++
+                 delta_E = alpha*cellDSB # here we just consider the direct effect
+                 x = -abs(E1+delta_E-E3)/2/sigma
+-                print 'delta energy is ',x
++                print('delta energy is ',x)
+                 p_total = 2*stats.norm.cdf(x,0,1)
+                 if E1+delta_E-E3>=0:
+                     p_total = 1# boundary condition
+-                print 'the total jumping probability is: ',p_total
+-                jumpingProbabilityPerMCS = p_total 
++                print('the total jumping probability is: ',p_total)
++                jumpingProbabilityPerMCS = p_total
+                 if cellDose!=0:
+                     if random.random()<jumpingProbabilityPerMCS:
+                         cell.type = self.NECROTIC # if so, cell dies due to radiation killing
+-        
++
+         numberOfTumorCells = 0
+         numberOfVascularCells = 0
+         numberOfNeovascularCells = 0
+@@ -133,39 +133,48 @@ class VolumeParamSteppable(SteppableBasePy):
+                 # pt.x=int(round(cell.xCM/max(float(cell.volume),0.001)))
+                 # pt.y=int(round(cell.yCM/max(float(cell.volume),0.001)))
+                 # pt.z=int(round(cell.zCM/max(float(cell.volume),0.001)))
+-                
++
+                 # VEGFConcentration=fieldVEGF2.get(pt)
+-                
++
+                 VEGFConcentration=fieldVEGF2[int(round(cell.xCOM)),int(round(cell.yCOM)),int(round(cell.zCOM))]
+-                
++
+                 # cellNeighborList=CellNeighborListAuto(self.nTrackerPlugin,cell)
+-                cellNeighborList=self.getCellNeighbors(cell)
++                cellNeighborList = self.getCellNeighborDataList(cell)
+                 for neighborSurfaceData in cellNeighborList:
+-                    #Check to ensure cell neighbor is not medium
+-                    if neighborSurfaceData.neighborAddress:
+-                        if neighborSurfaceData.neighborAddress.type == self.VASCULAR or neighborSurfaceData.neighborAddress.type == self.NEOVASCULAR:                            
+-                            #sum up common surface area of cell with its neighbors
+-                            totalArea+=neighborSurfaceData.commonSurfaceArea 
+-                            #print "  commonSurfaceArea:",neighborSurfaceData.commonSurfaceArea
+-                #print totalArea        
++                    # CC3D 4.x returns neighbor data as a tuple:
++                    # (neighbor_cell, common_surface_area).
++                    # Older CC3D returned an object with neighborAddress/commonSurfaceArea.
++                    if isinstance(neighborSurfaceData, tuple):
++                        neighbor_cell = neighborSurfaceData[0]
++                        common_surface_area = neighborSurfaceData[1]
++                    else:
++                        neighbor_cell = neighborSurfaceData.neighborAddress
++                        common_surface_area = neighborSurfaceData.commonSurfaceArea
++
++                    # Check to ensure cell neighbor is not medium
++                    if neighbor_cell:
++                        if neighbor_cell.type == self.VASCULAR or neighbor_cell.type == self.NEOVASCULAR:
++                            # sum up common surface area of cell with its neighbors
++                            totalArea += common_surface_area
++                #print totalArea
+                 if totalArea < 45:
+                     #Growth rate equation
+-                    
++
+                     cell.targetVolume+=2.0*VEGFConcentration/(0.01 + VEGFConcentration)
+-                    print "totalArea", totalArea,"cell growth rat& voxel/MCS \\e: ", 2.0*VEGFConcentration/(0.01 + VEGFConcentration),"cell Volume: ", cell.volume
+-         
++                    print("totalArea", totalArea,"cell growth rat& voxel/MCS \\e: ", 2.0*VEGFConcentration/(0.01 + VEGFConcentration),"cell Volume: ", cell.volume)
++
+             #Proliferating Cells
+             if cell.type == self.PROLIFERATING:
+-                
++
+                 numberOfTumorCells = numberOfTumorCells + 1 # tallying the tumor cells
+                 # pt=CompuCell.Point3D()
+                 # pt.x=int(round(cell.xCM/max(float(cell.volume),0.001)))
+                 # pt.y=int(round(cell.yCM/max(float(cell.volume),0.001)))
+                 # pt.z=int(round(cell.zCM/max(float(cell.volume),0.001)))
+                 # GlucoseConcentration=fieldGlucose.get(pt)
+-                
++
+                 GlucoseConcentration=fieldGlucose[int(round(cell.xCOM)),int(round(cell.yCOM)),int(round(cell.zCOM))]
+-                
++
+                 # Proliferating Cells become Necrotic when GlucoseConcentration is low
+                 if  GlucoseConcentration < 0.001 and mcs>1000:
+                     cell.type = self.NECROTIC
+@@ -178,20 +187,20 @@ class VolumeParamSteppable(SteppableBasePy):
+                 #sNecrotic Cells shrink at a constant rate
+                 numberOfNecroticCells = numberOfNecroticCells + 1
+                 cell.targetVolume-=0.1
+-        
++
+         self.numberOfTumorCellList.append(numberOfTumorCells)
+         self.numberOfVascularCellList.append(numberOfVascularCells)
+         self.numberOfNeovascularCellList.append(numberOfNeovascularCells)
+         self.numberOfNecroticCellList.append(numberOfNecroticCells)
+-        
++
+         self.pW.addDataPoint("Tumor Cells", mcs,numberOfTumorCells)
+         self.pW.addDataPoint("Vascular Cells", mcs,numberOfVascularCells)
+         self.pW.addDataPoint("Neovascular Cells",mcs,numberOfNeovascularCells)
+         self.pW.addDataPoint("Necrotic Cells",mcs,numberOfNecroticCells)
+- 
+-    
++
++
+     def finish(self):
+-        print 'the number of tumor  cells',self.numberOfTumorCellList
++        print('the number of tumor  cells',self.numberOfTumorCellList)
+         for index,i in enumerate( self.numberOfTumorCellList):
+             vascularNum = self.numberOfVascularCellList[index]
+             neovascularNum = self.numberOfNeovascularCellList[index]
+@@ -199,28 +208,28 @@ class VolumeParamSteppable(SteppableBasePy):
+             self.cellNumberFileOut.write('{0:d},{1:d},{2:d},{3:d},{4:d}\n'.format(index,i,vascularNum,neovascularNum,necroticNum)) # save the tumor cell number for each MCS
+         self.cellNumberFileOut.close()
+ 
+-        
++
+ class MitosisSteppable(MitosisSteppableBase):
+-    def __init__(self,_simulator,_frequency=1):
+-        MitosisSteppableBase.__init__(self,_simulator, _frequency)
+-     
++    def __init__(self, frequency=1):
++        MitosisSteppableBase.__init__(self, frequency)
++
+     def step(self,mcs):
+-        
++
+         cells_to_divide=[]
+-          
++
+         for cell in self.cellList:
+             if cell.type == self.PROLIFERATING and cell.volume>64:
+                 cells_to_divide.append(cell)
+             if cell.type== self.NEOVASCULAR and cell.volume>128:
+                 cells_to_divide.append(cell)
+ 
+-                     
++
+         for cell in cells_to_divide:
+ 
+             self.divideCellRandomOrientation(cell)
+-            
+-    def updateAttributes(self):    
+-        self.parentCell.targetVolume /= 2.0 # reducing parent target volume                 
+-        self.cloneParent2Child()            
+-              
+-                
+\ No newline at end of file
++
++    def updateAttributes(self):
++        self.parentCell.targetVolume /= 2.0 # reducing parent target volume
++        self.cloneParent2Child()
++
++

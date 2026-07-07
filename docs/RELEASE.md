@@ -1,5 +1,27 @@
 # GitHub Repository and Release Procedure
 
+## v0.4.0 — Modernized CompuCell3D VascularTumor workflow
+
+This release adds the modern CompuCell3D-compatible RADCELL VascularTumor workflow.
+
+Main changes:
+
+- modernizes the original RADCELL `VascularTumor` Python workflow for current CompuCell3D APIs;
+- removes the need for legacy `PYTHON_MODULE_PATH` and shim modules;
+- uses modern `cc3d` imports and steppable registration;
+- updates the VascularTumor neighbor API from `getCellNeighbors` to `getCellNeighborDataList`;
+- forces RADCELL/Geant4 execution to use headless `out` mode while keeping the CompuCell3D GUI usable;
+- adds `scripts/verify_radcell_compat.sh` to check whether a RADCELL checkout was patched correctly;
+- integrates compatibility verification into `scripts/setup_radcell_stack.sh`;
+- ignores CompuCell3D-generated `VascularTumor_cc3d_*` output directories.
+
+Validation performed locally:
+
+- patched RADCELL VascularTumor opens in CompuCell3D without compatibility shims;
+- cells remain stable during early GUI simulation steps;
+- RADCELL Python modules compile under the CompuCell3D Python environment;
+- compatibility verifier passes on the patched RADCELL checkout.
+
 ## Create repository
 
 The connector used to prepare this bundle cannot create a new GitHub repository. Use GitHub CLI locally:
