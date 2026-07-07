@@ -16,10 +16,11 @@ set -euo pipefail
 #
 # It is intentionally an orchestrator. Low-level steps are delegated to:
 #   scripts/apply_radcell_patch.sh
+#   scripts/verify_radcell_compat.sh
 #   scripts/build_radcell.sh
 #   scripts/create_radcell_launcher.sh
 
-VERSION="0.2.0"
+VERSION="0.4.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -47,6 +48,7 @@ ASSUME_YES=0
 SKIP_GEANT4_INSTALL=0
 SKIP_CLONE=0
 SKIP_PATCH=0
+SKIP_VERIFY=0
 SKIP_BUILD=0
 SKIP_LAUNCHER=0
 SKIP_IMPORT_TEST=0
@@ -133,6 +135,7 @@ Options:
   --skip-geant4-install       Do not attempt to install Geant4 if missing.
   --skip-clone                Do not clone RADCELL if missing.
   --skip-patch                Skip applying the RADCELL compatibility patch.
+  --skip-verify               Skip verifying the patched RADCELL source tree.
   --skip-build                Skip building RADCELL.
   --skip-launcher             Skip launcher creation.
   --skip-import-test          Skip final Python import test.
@@ -374,6 +377,10 @@ parse_args() {
         SKIP_PATCH=1
         shift
         ;;
+      --skip-verify)
+        SKIP_VERIFY=1
+        shift
+        ;;
       --skip-build)
         SKIP_BUILD=1
         shift
@@ -601,6 +608,10 @@ preflight_checks() {
     fail "Missing helper script: $REPO_DIR/scripts/apply_radcell_patch.sh"
   fi
 
+  if [ ! -x "$REPO_DIR/scripts/verify_radcell_compat.sh" ]; then
+    fail "Missing helper script: $REPO_DIR/scripts/verify_radcell_compat.sh"
+  fi
+
   if [ ! -x "$REPO_DIR/scripts/build_radcell.sh" ]; then
     fail "Missing helper script: $REPO_DIR/scripts/build_radcell.sh"
   fi
@@ -698,6 +709,24 @@ apply_patch() {
     "$REPO_DIR/scripts/apply_radcell_patch.sh" "$RADCELL_DIR"
 
   ok "Patch step completed."
+}
+
+verify_radcell_compat() {
+  section "Verifying RADCELL compatibility patch"
+
+  if [ "$SKIP_VERIFY" -eq 1 ]; then
+    warn "Skipping compatibility verification step."
+    return
+  fi
+
+  local log="$LOG_DIR/verify_radcell_compat.log"
+
+  spinner_run \
+    "Verifying patched RADCELL source" \
+    "$log" \
+    "$REPO_DIR/scripts/verify_radcell_compat.sh" "$RADCELL_DIR"
+
+  ok "Compatibility verification passed."
 }
 
 build_radcell() {
@@ -805,6 +834,7 @@ main() {
   ensure_geant4
   ensure_radcell_source
   apply_patch
+  verify_radcell_compat
   build_radcell
   create_launcher
   test_import
