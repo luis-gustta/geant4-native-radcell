@@ -82,16 +82,36 @@ reject_text() {
   fi
 }
 
+reject_regex() {
+  local file="$1"
+  local regex="$2"
+  local label="$3"
+
+  if grep -Eq "$regex" "$RADCELL_DIR/$file"; then
+    echo "FAIL: $label"
+    echo "      obsolete pattern found in $file:"
+    echo "      $regex"
+    failures=$((failures + 1))
+  else
+    echo "OK: $label"
+  fi
+}
+
 echo "[RADCELL] Compatibility verification"
 echo "[RADCELL] Root:"
 echo "  $RADCELL_DIR"
 echo
 
+check_file "RADCellSimulation/src/RADCellSimulation.cc"
 check_file "VascularTumor/Simulation/RADCellSimulation.py"
 check_file "VascularTumor/Simulation/RadiationTransportModule.py"
 check_file "VascularTumor/Simulation/VascularTumor.py"
 check_file "VascularTumor/Simulation/VascularTumorSteppables.py"
 echo
+
+require_text "RADCellSimulation/src/RADCellSimulation.cc" \
+  "Do not execute vis.mac during initialization." \
+  "RADCellSimulation.cc disables automatic Geant4 visualization macro in headless workflows"
 
 require_text "VascularTumor/Simulation/RADCellSimulation.py" \
   "RADCellSimulationInitializePyWrapper(1, [sys.argv[0]])" \
@@ -134,6 +154,18 @@ require_text "VascularTumor/Simulation/VascularTumorSteppables.py" \
   "VascularTumorSteppables.py uses headless RADCELL run mode"
 
 echo
+
+reject_regex "RADCellSimulation/src/RADCellSimulation.cc" \
+  '^[[:space:]]*UImanager->ApplyCommand\("/control/execute vis\.mac"\);' \
+  "RADCellSimulation.cc no longer executes vis.mac automatically"
+
+reject_text "RADCellSimulation/src/RADCellSimulation.cc" \
+  "visManager = new G4VisExecutive" \
+  "RADCellSimulation.cc no longer creates a Geant4 visualization manager"
+
+reject_text "RADCellSimulation/src/RADCellSimulation.cc" \
+  "ui = new G4UIExecutive" \
+  "RADCellSimulation.cc no longer creates a Geant4 UI session"
 
 reject_text "VascularTumor/Simulation/VascularTumor.py" \
   "PYTHON_MODULE_PATH" \

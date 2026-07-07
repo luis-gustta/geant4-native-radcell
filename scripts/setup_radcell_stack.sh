@@ -20,7 +20,7 @@ set -euo pipefail
 #   scripts/build_radcell.sh
 #   scripts/create_radcell_launcher.sh
 
-VERSION="0.4.0"
+VERSION="0.4.1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
