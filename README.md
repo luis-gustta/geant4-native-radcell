@@ -30,6 +30,34 @@ CompuCell3D Player
 
 The Geant4/RADCELL backend is built without its own Geant4 Qt/OpenGL visualization window. This does **not** prevent using the CompuCell3D graphical interface.
 
+## First RADCELL/VascularTumor smoke test
+
+For a clean Ubuntu/Mint setup, this repository includes a helper script for running the original RADCELL `VascularTumor` example in headless CompuCell3D mode.
+
+The smoke test verifies that the native Geant4/RADCELL/CompuCell3D stack can run before larger workflows.
+
+Run it from a working directory outside this repository:
+
+```bash
+mkdir -p ~/Desktop/simulacoes_radcell_test
+cd ~/Desktop/simulacoes_radcell_test
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh
+```
+
+The script creates timestamped output directories under:
+
+```text
+radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
+```
+
+Each run writes at least:
+
+- `cc3d_headless.log`
+- `run_manifest.json`
+
+See the full walkthrough in [`docs/radcell_first_run.md`](docs/radcell_first_run.md).
+
 ## Recommended setup
 
 For most users, the recommended entry point is the interactive setup orchestrator:
