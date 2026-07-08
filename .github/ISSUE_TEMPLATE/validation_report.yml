@@ -1,0 +1,70 @@
+name: Validation report
+description: Report a successful or failed validation run using the validation matrix
+title: "Validation report: "
+labels: [validation]
+body:
+  - type: input
+    id: repo-version
+    attributes:
+      label: geant4-native-radcell version or commit
+      placeholder: "v0.4.2 or commit hash"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04.1"
+    validations:
+      required: true
+
+  - type: input
+    id: geant4-version
+    attributes:
+      label: Geant4 version and prefix
+      placeholder: "11.4.2 at /opt/geant4/11.4.2"
+    validations:
+      required: true
+
+  - type: input
+    id: cc3d
+    attributes:
+      label: CompuCell3D version and Python path
+      placeholder: "CompuCell3D 4.8.0, ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Completed checks
+      options:
+        - label: Geant4 environment loads
+        - label: `geant4-config --version` returns expected version
+        - label: Geant4 B1 builds and runs
+        - label: RADCELL patch applies or is already applied
+        - label: `verify_radcell_compat.sh` passes
+        - label: RADCELL builds and installs
+        - label: launcher is created
+        - label: `import radcell` works through launcher
+        - label: direct `RADCellSimulation.py` run works
+        - label: headless `VascularTumor` smoke test starts
+        - label: GUI CompuCell3D launch works through launcher
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Paste key command outputs or paths to logs/manifests.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Include deviations from the documented workflow, hardware limits, timeouts, or warnings.
+    validations:
+      required: false

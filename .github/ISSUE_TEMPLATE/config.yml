@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: RADCELL upstream project
+    url: https://github.com/forgetsummer/RADCELL
+    about: Use upstream for questions about the original RADCELL scientific model or source code outside this compatibility toolkit.

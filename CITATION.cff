@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite it as below."
+title: "Geant4 Native Installer and RADCELL Compatibility Toolkit"
+authors:
+  - family-names: "Gaiato"
+    given-names: "Luis Gustavo Lang"
+version: "0.4.2"
+date-released: "2026-07-08"
+url: "https://github.com/luis-gustta/geant4-native-radcell"
+repository-code: "https://github.com/luis-gustta/geant4-native-radcell"
+license: "MIT"
+keywords:
+  - Geant4
+  - RADCELL
+  - CompuCell3D
+  - radiation transport
+  - radiobiology
+  - reproducible installation
+  - Linux
+abstract: >-
+  Native Linux installer and Debian package workflow for Geant4, plus a
+  compatibility toolkit for building and running the original RADCELL project
+  against a modern Geant4 and CompuCell3D stack.

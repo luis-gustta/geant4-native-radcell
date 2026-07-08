@@ -1,0 +1,1728 @@
+\documentclass[11pt,a4paper,twoside,pdftex]{refrep}
+
+% -----------------------------------------------------------------------------
+% Language, encoding, and typography
+% -----------------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{microtype}
+\usepackage{newpxtext}
+\usepackage{newpxmath}
+\linespread{1.035}
+
+% -----------------------------------------------------------------------------
+% Structural packages
+% -----------------------------------------------------------------------------
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{array}
+\usepackage{upquote}
+
+% The refrep class controls page geometry, headers, and text width.
+% Do not load geometry/fancyhdr here: doing so breaks the refman/refrep layout.
+\settextfraction{0.72}
+\setcounter{tocdepth}{2}
+\renewcommand{\abstractname}{Abstract}
+
+% -----------------------------------------------------------------------------
+% Documented repository metadata
+% -----------------------------------------------------------------------------
+\newcommand{\RepositoryName}{\texttt{geant4-native-radcell}}
+\newcommand{\RepositoryURL}{\url{https://github.com/luis-gustta/geant4-native-radcell}}
+\newcommand{\RepositoryVersion}{v0.4.2}
+\newcommand{\RepositoryReleaseTitle}{Fresh Ubuntu RADCELL first-run workflow}
+\newcommand{\RepositoryReleaseDate}{July 8, 2026}
+\newcommand{\RepositoryReleaseCommit}{2f50830}
+
+% -----------------------------------------------------------------------------
+% PDF links and metadata
+% -----------------------------------------------------------------------------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=black,
+  citecolor=black,
+  pdftitle={Geant4 Native Installer and RADCELL Compatibility Toolkit Manual - v0.4.2},
+  pdfauthor={Luis Gustavo Lang Gaiato}
+}
+
+% -----------------------------------------------------------------------------
+% Source code and terminal blocks
+% -----------------------------------------------------------------------------
+\definecolor{codebg}{RGB}{247,247,247}
+\definecolor{codeframe}{RGB}{210,210,210}
+\definecolor{notegray}{RGB}{70,70,70}
+
+\lstdefinestyle{manualcode}{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=2,
+  upquote=true,
+  literate={á}{{\'a}}1 {à}{{\`a}}1 {ã}{{\~a}}1 {â}{{\^a}}1 {é}{{\'e}}1 {ê}{{\^e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ô}{{\^o}}1 {õ}{{\~o}}1 {ú}{{\'u}}1 {ç}{{\c{c}}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {Ç}{{\c{C}}}1
+}
+
+\lstset{style=manualcode}
+
+\begin{document}
+
+\begin{titlepage}
+  \thispagestyle{empty}
+
+  \vspace*{1.0cm}
+
+  \noindent\hspace*{-\leftmarginwidth}%
+\begin{minipage}{\fullwidth}
+{\LARGE Technical Manual\par}
+
+\vspace{0.32cm}
+
+\noindent\rule{\fullwidth}{0.8pt}\par
+\end{minipage}
+
+  \vspace{1.2cm}
+
+  {\Huge\bfseries Geant4 Native Installer}
+
+  {\Huge\bfseries and RADCELL Compatibility Toolkit}
+
+  \vspace{0.35cm}
+
+  {\LARGE Installation, compatibility, execution, and modification of
+  RADCELL/\texttt{VascularTumor} experiments\par}
+
+  \vspace{1.35cm}
+
+  \noindent
+  \begin{tabular}{@{}p{0.30\textwidth}p{0.62\textwidth}@{}}
+    \textbf{Repository} & \RepositoryName \\
+    \textbf{URL} & \RepositoryURL \\
+    \textbf{Documented release} & \RepositoryVersion \\
+    \textbf{Release title} & \RepositoryReleaseTitle \\
+    \textbf{Release date} & \RepositoryReleaseDate \\
+    \textbf{Release commit} & \texttt{\RepositoryReleaseCommit} \\
+  \end{tabular}
+
+  \vfill
+
+  {\large Luis Gustavo Lang Gaiato}\par
+  \vspace{0.35cm}
+  {\small Expanded manual version. This document was prepared from the base
+  LaTeX source, the repository documentation, and the technical history of the project.}\par
+
+  \vspace{0.8cm}
+  \rule{\textwidth}{0.7pt}\par
+  \vspace{0.25cm}
+  {\small Updated on \today}\par
+\end{titlepage}
+
+\tableofcontents
+
+\chapter{Overview}
+
+\section{Problem solved by this repository}
+
+RADCELL is a cell--radiation simulation workflow that combines CompuCell3D, RADCELL, and Geant4. The practical problem is that the original RADCELL repository provides only high-level installation instructions, while the fragile part of the process is assembling the full runtime stack correctly:
+
+\begin{itemize}
+  \item Geant4 must be installed and discoverable by CMake;
+  \item Geant4 libraries and datasets must be available at runtime;
+  \item RADCELL must be compiled against the correct Geant4 version;
+  \item the RADCELL Python wrapper must be compiled against the Python interpreter used by CompuCell3D;
+  \item the execution environment must provide the correct \texttt{PYTHONPATH}, \texttt{LD\_LIBRARY\_PATH}, and local \texttt{LD\_PRELOAD};
+  \item the \texttt{VascularTumor} workflow must be updated for modern CompuCell3D APIs;
+  \item the Geant4/RADCELL backend must run without trying to open its own Qt/OpenGL window.
+\end{itemize}
+
+The \texttt{geant4-native-radcell} repository is not a full scientific reimplementation of RADCELL. It is an infrastructure and compatibility layer that makes it possible to reproduce the original workflow on a modern Linux machine.
+
+\section{Intended execution model}
+
+The expected runtime model is:
+
+\begin{lstlisting}
+CompuCell3D Player
+    -> VascularTumor.cc3d
+    -> RADCellSimulation.py
+    -> compiled RADCELL / Geant4 backend
+\end{lstlisting}
+
+CompuCell3D may still be used through its graphical interface. The part that should run in headless mode is the Geant4/RADCELL backend. In the modernized workflow, RADCELL should not automatically execute \texttt{vis.mac} or open \texttt{/vis/open OGL}.
+
+\section{Current scope}
+
+The project currently covers:
+
+\begin{enumerate}
+  \item native installation of Geant4 under \path{/opt/geant4/11.4.2};
+  \item optional construction of a Debian \texttt{.deb} package;
+  \item cloning or locating a local checkout of the original RADCELL repository;
+  \item applying the compatibility patch;
+  \item verifying that the patch is present;
+  \item building RADCELL against Geant4 11.4.2 and the Python 3.12 interpreter used by CompuCell3D;
+  \item creating an isolated launcher;
+  \item validating \texttt{import radcell};
+  \item running \texttt{RADCellSimulation.py} directly;
+  \item opening \texttt{VascularTumor.cc3d} in CompuCell3D;
+  \item running a headless smoke test with outputs organized under \texttt{\$PWD/radcell\_runs/}.
+\end{enumerate}
+
+\section{What this repository does not do}
+
+This repository does not distribute the RADCELL source code. The reason is conservative: the public RADCELL repository appears not to contain an explicit license file. Public visibility on GitHub is not equivalent to permission to redistribute, modify, or create derivative works. For that reason, this repository distributes scripts, documentation, and a patch that the user applies locally to a separately obtained checkout.
+
+It is also not yet a high-level scientific library for creating new models from scratch. A higher-level scenario layer should belong to a future project or a later stage. This repository should remain focused on installation, compatibility, and first-run execution of the original RADCELL workflow.
+
+\chapter{Repository structure}
+
+\section{Main files and directories}
+
+\begin{longtable}{p{0.34\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Path} & \textbf{Purpose} \\
+\midrule
+\endhead
+
+\path{README.md} &
+Main project page. Explains the repository goal, recommended workflow, installation, validation, launcher, output policy, and links to documentation. \\
+
+\path{install_geant4_native.sh} &
+Native Geant4 installer and Debian package generator. Installs Geant4 under \path{/opt/geant4/<version>} and can generate a \texttt{.deb}. \\
+
+\path{patches/radcell_compat_geant4_11_python312_cc3d.patch} &
+Main patch applied to the original RADCELL source tree. Modernizes the code for Geant4 11, Python 3.12, modern CompuCell3D, and headless execution. \\
+
+\path{scripts/setup_radcell_stack.sh} &
+High-level orchestrator. Locates or clones RADCELL, detects CompuCell3D Python, verifies Geant4, applies the patch, verifies compatibility, builds, creates the launcher, and tests the import. \\
+
+\path{scripts/apply_radcell_patch.sh} &
+Applies the compatibility patch. Detects whether the patch is applicable or already applied using forward and reverse dry-runs. \\
+
+\path{scripts/verify_radcell_compat.sh} &
+Checks whether a RADCELL checkout contains the expected changes. Searches for required text and rejects obsolete patterns. \\
+
+\path{scripts/build_radcell.sh} &
+Configures, builds, and installs RADCELL against Geant4 and the CompuCell3D Python interpreter. Uses CMake with \texttt{WITH\_GEANT4\_UIVIS=OFF}. \\
+
+\path{scripts/create_radcell_launcher.sh} &
+Creates \path{~/run_radcell_cc3d_python.sh}, a launcher that encapsulates \texttt{PYTHONPATH}, \texttt{LD\_LIBRARY\_PATH}, \texttt{LD\_PRELOAD}, and the Geant4/RADCELL runtime environment. \\
+
+\path{scripts/run_vasculartumor_headless.sh} &
+Runs a headless \texttt{VascularTumor} smoke test through \texttt{cc3d.run\_script}. Saves results under \texttt{\$PWD/radcell\_runs/<run>/}. \\
+
+\path{scripts/upload-release.sh} &
+Helper script for creating a GitHub release and uploading artifacts such as the \texttt{.deb} package. \\
+
+\path{docs/} &
+Project technical documents: installation, motivation, first run, remake strategy, release workflow, and validation. \\
+
+\path{checksums/} &
+Checksum files for release artifacts, when applicable. \\
+
+\path{THIRD_PARTY_NOTICES.md} &
+Third-party notices and licensing considerations. \\
+
+\bottomrule
+\end{longtable}
+
+\section{Generated directories that should not pollute the repository}
+
+CompuCell3D may generate directories such as:
+
+\begin{lstlisting}
+VascularTumor_cc3d_07_07_2026_01_41_14_e3edf7/
+\end{lstlisting}
+
+These directories should not be used as the default output location inside the root of this repository. The current policy is that execution scripts write to:
+
+\begin{lstlisting}
+$PWD/radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
+\end{lstlisting}
+
+The user therefore chooses the workspace by changing the current directory before calling the script.
+
+\chapter{Documents under \texttt{docs/}}
+
+\section{\texttt{docs/INSTALLATION.md}}
+
+Short Geant4 installation and validation document. It covers:
+
+\begin{itemize}
+  \item building a Debian package with \texttt{install\_geant4\_native.sh --deb};
+  \item installing \texttt{geant4-native\_11.4.2-1\_amd64.deb};
+  \item loading \texttt{geant4.sh};
+  \item validating with \texttt{geant4-config --version};
+  \item inspecting \texttt{G4...DATA} variables;
+  \item checking shared libraries with \texttt{ldd};
+  \item validating the Geant4 B1 example.
+\end{itemize}
+
+It is a Geant4-only validation document, used before entering the RADCELL workflow.
+
+\section{\texttt{docs/MOTIVATION.md}}
+
+Explains the motivation for the project:
+
+\begin{itemize}
+  \item RADCELL depends on Geant4, but the upstream instructions are not sufficient for a clean installation;
+  \item the focus is to remove ambiguity from Geant4 installation;
+  \item the native \texttt{.deb} strategy is more direct for a workstation or laboratory than using Spack;
+  \item Geant4 datasets are large, and the script handles download in a more robust way with resume and validation.
+\end{itemize}
+
+The document also defines the target audience: Linux users trying to compile RADCELL, computational biology/radiobiology students, and laboratories needing a reproducible installation.
+
+\section{\texttt{docs/radcell\_installation\_v0.md}}
+
+This is the step-by-step RADCELL installation manual using native Geant4 and CompuCell3D. It covers:
+
+\begin{enumerate}
+  \item installing system dependencies;
+  \item installing CompuCell3D;
+  \item installing native Geant4;
+  \item cloning RADCELL;
+  \item applying the patch;
+  \item building and installing RADCELL;
+  \item creating the launcher;
+  \item testing the Python module;
+  \item running \texttt{RADCellSimulation.py} directly;
+  \item opening \texttt{VascularTumor.cc3d} in CompuCell3D Player;
+  \item running headless;
+  \item resolving common errors.
+\end{enumerate}
+
+It is the document closest to a complete manual installation tutorial.
+
+\section{\texttt{docs/radcell\_first\_run.md}}
+
+First validation guide after installation. Its goal is not to validate the biology or the full physics model, but to confirm that the installation is usable:
+
+\begin{itemize}
+  \item the launcher imports \texttt{radcell};
+  \item Geant4 is available at runtime;
+  \item \texttt{RADCellSimulation.py} runs directly;
+  \item CompuCell3D Player opens with the RADCELL environment;
+  \item \texttt{VascularTumor.cc3d} can call RADCELL during a radiation step.
+\end{itemize}
+
+This document also records the new interpretation of visualization errors: in \texttt{v0.4.1+}, messages such as \texttt{/vis/open OGL} or \texttt{vis.mac} indicate an old checkout or incomplete patch, not a normal warning.
+
+\section{\texttt{docs/RADCELL\_REMAKE\_STRATEGY.md}}
+
+Strategic and legal/technical document. The central point is:
+
+\begin{quote}
+The repository should not copy or redistribute the RADCELL code, because the upstream repository appears not to contain an explicit license.
+\end{quote}
+
+The recommended route for a future project is a clean-room alternative with its own API and no direct dependency on the RADCELL source code. The document proposes a Geant4-first architecture with:
+
+\begin{itemize}
+  \item a Geant4/Geant4-DNA engine;
+  \item explicit cell, nucleus, and cytoplasm geometry;
+  \item YAML/JSON input;
+  \item energy, dose, and damage-proxy scoring;
+  \item HDF5/CSV/Parquet output;
+  \item optional coupling to CompuCell3D.
+\end{itemize}
+
+\section{\texttt{docs/RELEASE.md}}
+
+Release procedure document. It records milestones already completed, including:
+
+\begin{itemize}
+  \item \texttt{v0.4.0}: modernization of the \texttt{VascularTumor} workflow for modern CompuCell3D;
+  \item \texttt{v0.4.1}: cleanup of headless execution and removal of automatic \texttt{vis.mac} execution;
+  \item guidance not to commit the \texttt{.deb} package;
+  \item use of GitHub Releases for binary artifacts;
+  \item checksum calculation.
+\end{itemize}
+
+Although the public release history has advanced to \texttt{v0.4.2}, the release document remains useful as a record of milestones and procedure.
+
+\chapter{Main scripts}
+
+\section{\texttt{setup\_radcell\_stack.sh}}
+
+This is the most important script for a new user. It is an orchestrator, not a duplicate implementation of the lower-level steps.
+
+\subsection{Main functions}
+
+\begin{itemize}
+  \item uses \path{~/radcell} as the default \texttt{workdir};
+  \item expects or creates \path{~/radcell/RADCELL};
+  \item uses the default Geant4 prefix \path{/opt/geant4/11.4.2};
+  \item uses \path{~/.local/radcell} as the RADCELL installation prefix;
+  \item creates the default launcher at \path{~/run_radcell_cc3d_python.sh};
+  \item saves logs under \path{/tmp/radcell-stack-setup/<timestamp>/};
+  \item delegates steps to \texttt{apply\_radcell\_patch.sh}, \texttt{verify\_radcell\_compat.sh}, \texttt{build\_radcell.sh}, and \texttt{create\_radcell\_launcher.sh}.
+\end{itemize}
+
+Interactive use:
+
+\begin{lstlisting}
+./scripts/setup_radcell_stack.sh
+\end{lstlisting}
+
+Typical non-interactive use:
+
+\begin{lstlisting}
+./scripts/setup_radcell_stack.sh \
+  --workdir ~/radcell \
+  --cc3d-python ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python \
+  --yes
+\end{lstlisting}
+
+\subsection{Important options}
+
+\begin{longtable}{p{0.32\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Option} & \textbf{Purpose} \\
+\midrule
+\endhead
+
+\texttt{--workdir PATH} & Parent directory where RADCELL will be found or cloned. \\
+\texttt{--cc3d-python PATH} & Python interpreter from the CompuCell3D environment. It must be the same interpreter used to build the wrapper. \\
+\texttt{--geant4-prefix PATH} & Geant4 prefix, default \path{/opt/geant4/11.4.2}. \\
+\texttt{--radcell-prefix PATH} & RADCELL installation prefix, default \path{~/.local/radcell}. \\
+\texttt{--launcher PATH} & Path of the created launcher, default \path{~/run_radcell_cc3d_python.sh}. \\
+\texttt{--jobs N} & Number of build jobs. \\
+\texttt{--skip-*} & Allows individual steps to be skipped for debugging. \\
+\texttt{--dry-run} & Shows the plan without modifying files. \\
+\bottomrule
+\end{longtable}
+
+\section{\texttt{apply\_radcell\_patch.sh}}
+
+Applies the compatibility patch to a local RADCELL checkout. The script requires the target directory to contain:
+
+\begin{lstlisting}
+RADCellSimulation/
+VascularTumor/
+\end{lstlisting}
+
+Use:
+
+\begin{lstlisting}
+./scripts/apply_radcell_patch.sh /path/to/RADCELL
+\end{lstlisting}
+
+It distinguishes three states:
+
+\begin{enumerate}
+  \item patch applicable: it runs \texttt{patch --dry-run --forward} and then applies the patch;
+  \item patch already applied: reverse dry-run succeeds;
+  \item conflict: neither forward nor reverse dry-run succeeds.
+\end{enumerate}
+
+If it fails, the script suggests diagnosing patterns such as:
+
+\begin{lstlisting}
+PyString_FromString
+PyInt_AsLong
+G4MTRunManager
+g4root.hh
+theParticleIterator
+\end{lstlisting}
+
+These patterns correspond to common incompatibilities with Python 3, Geant4 11, and API changes.
+
+\section{\texttt{verify\_radcell\_compat.sh}}
+
+Verifies that a RADCELL checkout has been patched correctly. It looks for expected files and text, for example:
+
+\begin{itemize}
+  \item \path{RADCellSimulation/src/RADCellSimulation.cc};
+  \item \path{VascularTumor/Simulation/RADCellSimulation.py};
+  \item \path{VascularTumor/Simulation/RadiationTransportModule.py};
+  \item \path{VascularTumor/Simulation/VascularTumor.py};
+  \item \path{VascularTumor/Simulation/VascularTumorSteppables.py}.
+\end{itemize}
+
+It also rejects obsolete patterns:
+
+\begin{itemize}
+  \item automatic execution of \texttt{vis.mac};
+  \item creation of \texttt{G4VisExecutive};
+  \item creation of \texttt{G4UIExecutive};
+  \item use of \texttt{PYTHON\_MODULE\_PATH};
+  \item old \texttt{SteppableRegistry} API usage;
+  \item launching generic \texttt{python} instead of \texttt{sys.executable};
+  \item old \texttt{self.getCellNeighbors(cell)} usage.
+\end{itemize}
+
+Use:
+
+\begin{lstlisting}
+./scripts/verify_radcell_compat.sh ~/radcell/RADCELL
+\end{lstlisting}
+
+\section{\texttt{build\_radcell.sh}}
+
+Builds and installs RADCELL. It receives the RADCELL path and, optionally, the CompuCell3D Python interpreter:
+
+\begin{lstlisting}
+./scripts/build_radcell.sh ~/radcell/RADCELL
+
+./scripts/build_radcell.sh \
+  ~/radcell/RADCELL \
+  ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python
+\end{lstlisting}
+
+Important variables:
+
+\begin{longtable}{p{0.30\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Variable} & \textbf{Default} \\
+\midrule
+\endhead
+\texttt{GEANT4\_PREFIX} & \path{/opt/geant4/11.4.2} \\
+\texttt{RADCELL\_PREFIX} & \path{~/.local/radcell} \\
+\texttt{JOBS} & \texttt{nproc} \\
+\bottomrule
+\end{longtable}
+
+The script:
+
+\begin{enumerate}
+  \item loads \texttt{geant4.sh};
+  \item detects the Python include directory and library;
+  \item exports library paths;
+  \item removes and recreates \texttt{RADCellSimulation/build};
+  \item invokes CMake;
+  \item uses \texttt{-DWITH\_GEANT4\_UIVIS=OFF};
+  \item builds with \texttt{make -j};
+  \item installs under \path{~/.local/radcell}.
+\end{enumerate}
+
+Expected files after installation:
+
+\begin{lstlisting}
+~/.local/radcell/bin/libradcelllib.so
+~/.local/radcell/bin/_radcell.so
+~/.local/radcell/bin/radcell.py
+~/.local/radcell/bin/test
+\end{lstlisting}
+
+\section{\texttt{create\_radcell\_launcher.sh}}
+
+Creates the launcher:
+
+\begin{lstlisting}
+~/run_radcell_cc3d_python.sh
+\end{lstlisting}
+
+This launcher is a critical component. It configures the environment only for the invoked process, avoiding contamination of \path{~/.bashrc}, \path{~/.profile}, or \path{/etc/environment}.
+
+It defines:
+
+\begin{itemize}
+  \item \texttt{RADCELL\_PREFIX};
+  \item \texttt{GEANT4\_PREFIX};
+  \item \texttt{G4LIB};
+  \item loads \texttt{geant4.sh};
+  \item includes \path{~/.local/radcell/bin} in \texttt{PYTHONPATH};
+  \item includes RADCELL and Geant4 libraries in \texttt{LD\_LIBRARY\_PATH};
+  \item assembles \texttt{G4\_PRELOAD} with \texttt{libG4*.so} libraries;
+  \item runs the CompuCell3D Python interpreter with local \texttt{LD\_PRELOAD}.
+\end{itemize}
+
+Test:
+
+\begin{lstlisting}
+~/run_radcell_cc3d_python.sh -c "import radcell; print(radcell)"
+\end{lstlisting}
+
+\section{\texttt{run\_vasculartumor\_headless.sh}}
+
+Runs a headless \texttt{VascularTumor} smoke test. The important point is the output policy: the script captures the directory from which it was called and creates outputs under:
+
+\begin{lstlisting}
+$PWD/radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
+\end{lstlisting}
+
+Typical use:
+
+\begin{lstlisting}
+mkdir -p ~/Desktop/radcell_workspace
+cd ~/Desktop/radcell_workspace
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir ~/radcell/RADCELL \
+  --launcher ~/run_radcell_cc3d_python.sh
+\end{lstlisting}
+
+Options:
+
+\begin{longtable}{p{0.32\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Option} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{--radcell-dir PATH} & Patched RADCELL checkout. Default: \path{~/radcell/RADCELL}. \\
+\texttt{--cc3d-python PATH} & CompuCell3D Python interpreter. Default: \path{~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python}. \\
+\texttt{--launcher PATH} & RADCELL/CC3D launcher. Default: \path{~/run_radcell_cc3d_python.sh}. \\
+\texttt{--output-dir PATH} & Base directory where runs will be created. Default: \path{$PWD/radcell_runs}. \\
+\texttt{--timeout SECONDS} & Maximum runtime. Default: 120 s. \\
+\bottomrule
+\end{longtable}
+
+Each run contains:
+
+\begin{lstlisting}
+VascularTumor.cc3d
+cc3d_headless.log
+run_manifest.json
+\end{lstlisting}
+
+Log validation distinguishes three states:
+
+\begin{enumerate}
+  \item CC3D started;
+  \item RADCELL was called;
+  \item Geant4 initialized.
+\end{enumerate}
+
+A short smoke test may pass with only CC3D initialized, because the original \texttt{VascularTumor} workflow may call radiation only at high MCS. To wait for the RADCELL/Geant4 call:
+
+\begin{lstlisting}
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir ~/radcell/RADCELL \
+  --launcher ~/run_radcell_cc3d_python.sh \
+  --timeout 300
+\end{lstlisting}
+
+\chapter{RADCELL compatibility patch}
+
+\section{Why the patch exists}
+
+The original RADCELL code was written for an older software stack. The patch resolves incompatibilities with:
+
+\begin{itemize}
+  \item Geant4 11.4.2;
+  \item Python 3.12;
+  \item modern CompuCell3D;
+  \item headless execution in current workflows.
+\end{itemize}
+
+\section{Files modified in RADCELL}
+
+The main files modified by the patch are:
+
+\begin{longtable}{p{0.40\textwidth}p{0.52\textwidth}}
+\toprule
+\textbf{File in RADCELL} & \textbf{Purpose of the modification} \\
+\midrule
+\endhead
+
+\path{RADCellSimulation/src/RADCellSimulation.cc} &
+Removes/avoids automatic \texttt{vis.mac} execution; removes the need to open a Geant4 UI/visualization window; allows headless execution. \\
+
+\path{VascularTumor/Simulation/RADCellSimulation.py} &
+Fixes argument passing to the Geant4/RADCELL wrapper; avoids \texttt{argv}-related crashes; modernizes prints and Python behavior. \\
+
+\path{VascularTumor/Simulation/RadiationTransportModule.py} &
+Updates imports to \texttt{cc3d.core.PySteppables} and \texttt{cc3d.cpp}; uses \texttt{sys.executable} to launch the script with the same Python interpreter used by CompuCell3D. \\
+
+\path{VascularTumor/Simulation/VascularTumor.py} &
+Migrates to the modern CompuCell3D API: \texttt{from cc3d import CompuCellSetup}, \texttt{register\_steppable}, and \texttt{CompuCellSetup.run()}. \\
+
+\path{VascularTumor/Simulation/VascularTumorSteppables.py} &
+Updates imports and constructors; replaces the old neighbor API with \texttt{getCellNeighborDataList}; forces the headless \texttt{out} \texttt{runMode}. \\
+
+\bottomrule
+\end{longtable}
+
+\section{Critical change: \texttt{vis.mac}}
+
+Before the headless correction, RADCELL attempted to execute:
+
+\begin{lstlisting}
+/control/execute vis.mac
+\end{lstlisting}
+
+and then:
+
+\begin{lstlisting}
+/vis/open OGL 600x400-0+0
+\end{lstlisting}
+
+In headless execution this caused errors such as:
+
+\begin{lstlisting}
+COMMAND NOT FOUND </vis/open OGL 600x400-0+0>
+Can not open a macro file <vis.mac>
+\end{lstlisting}
+
+Starting with \texttt{v0.4.1+}, these errors should be treated as evidence of an old checkout, incomplete patching, or a pending rebuild. The RADCELL/Geant4 backend should run without opening its own graphics window.
+
+\section{Critical change: CompuCell3D Python}
+
+RADCELL must be built against the Python interpreter used by CompuCell3D, not against an arbitrary system Python. For that reason, the build uses:
+
+\begin{lstlisting}
+~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python
+\end{lstlisting}
+
+or an explicitly provided path.
+
+If the \texttt{\_radcell.so} wrapper is built against a different Python interpreter, import may fail or produce difficult-to-debug runtime errors.
+
+\chapter{Installation on a clean machine}
+
+\section{Prerequisites}
+
+Recommended system:
+
+\begin{itemize}
+  \item Ubuntu 24.04 or a compatible Ubuntu-based Linux Mint release;
+  \item C/C++ compiler;
+  \item CMake;
+  \item SWIG;
+  \item Python 3;
+  \item CompuCell3D installed;
+  \item internet access to download Geant4/RADCELL/datasets.
+\end{itemize}
+
+\section{Install system dependencies}
+
+\begin{lstlisting}
+sudo apt update
+
+sudo apt install -y \
+  git \
+  build-essential \
+  cmake \
+  ninja-build \
+  make \
+  gcc \
+  g++ \
+  swig \
+  python3 \
+  python3-venv \
+  python3-pip \
+  wget \
+  curl \
+  ca-certificates \
+  pkg-config
+\end{lstlisting}
+
+Common Geant4 libraries:
+
+\begin{lstlisting}
+sudo apt install -y \
+  libxerces-c-dev \
+  libcurl4-openssl-dev \
+  libssl-dev \
+  libglu1-mesa \
+  qt6-base-dev \
+  libqt6opengl6-dev \
+  libexpat1-dev \
+  zlib1g-dev \
+  libfreetype-dev \
+  libx11-dev \
+  libxext-dev \
+  libxmu-dev \
+  libxi-dev
+\end{lstlisting}
+
+\section{Install CompuCell3D}
+
+Install CompuCell3D before building RADCELL. Then check:
+
+\begin{lstlisting}
+ls ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python
+~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python --version
+\end{lstlisting}
+
+If the path is different, record the exact path and pass it as \texttt{--cc3d-python}.
+
+\section{Clone this repository}
+
+\begin{lstlisting}
+git clone https://github.com/luis-gustta/geant4-native-radcell.git
+cd geant4-native-radcell
+\end{lstlisting}
+
+\section{Recommended automatic workflow}
+
+\begin{lstlisting}
+./scripts/setup_radcell_stack.sh \
+  --workdir ~/radcell \
+  --cc3d-python ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python \
+  --yes
+\end{lstlisting}
+
+This command should:
+
+\begin{enumerate}
+  \item use or clone \path{~/radcell/RADCELL};
+  \item check Geant4;
+  \item install Geant4 if necessary;
+  \item apply the patch;
+  \item verify compatibility;
+  \item build and install RADCELL;
+  \item create \path{~/run_radcell_cc3d_python.sh};
+  \item test \texttt{import radcell};
+  \item save logs under \path{/tmp/radcell-stack-setup/<timestamp>/}.
+\end{enumerate}
+
+\section{Manual/debug workflow}
+
+Use this when you need to isolate problems:
+
+\begin{lstlisting}
+git clone https://github.com/forgetsummer/RADCELL.git ~/radcell/RADCELL
+
+./scripts/apply_radcell_patch.sh ~/radcell/RADCELL
+
+./scripts/verify_radcell_compat.sh ~/radcell/RADCELL
+
+./scripts/build_radcell.sh \
+  ~/radcell/RADCELL \
+  ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python
+
+./scripts/create_radcell_launcher.sh \
+  ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python
+
+~/run_radcell_cc3d_python.sh -c "import radcell; print(radcell)"
+\end{lstlisting}
+
+\chapter{Validation}
+
+\section{Validate Geant4}
+
+\begin{lstlisting}
+source /opt/geant4/11.4.2/bin/geant4.sh
+[ -r /etc/profile.d/geant4-11.4.2-datasets.sh ] && \
+  source /etc/profile.d/geant4-11.4.2-datasets.sh
+
+geant4-config --version
+geant4-config --prefix
+env | grep '^G4.*DATA'
+\end{lstlisting}
+
+Expected:
+
+\begin{lstlisting}
+11.4.2
+/opt/geant4/11.4.2
+\end{lstlisting}
+
+Validate libraries:
+
+\begin{lstlisting}
+find /opt/geant4/11.4.2/lib -name "*.so" -exec ldd {} \; | grep "not found"
+\end{lstlisting}
+
+Expected output: none.
+
+\section{Validate the Geant4 B1 example}
+
+\begin{lstlisting}
+rm -rf ~/geant4-test
+mkdir -p ~/geant4-test
+cp -r /opt/geant4/11.4.2/share/Geant4/examples/basic/B1 ~/geant4-test/
+
+cmake -S ~/geant4-test/B1 \
+      -B ~/geant4-test/B1/build \
+      -DGeant4_DIR=/opt/geant4/11.4.2/lib/cmake/Geant4
+
+cmake --build ~/geant4-test/B1/build --parallel 4
+
+cd ~/geant4-test/B1/build
+./exampleB1 ../run1.mac
+\end{lstlisting}
+
+\section{Validate the RADCELL import}
+
+\begin{lstlisting}
+~/run_radcell_cc3d_python.sh -c "import radcell; print(radcell)"
+\end{lstlisting}
+
+Expected:
+
+\begin{lstlisting}
+<module 'radcell' from '/home/USER/.local/radcell/bin/radcell.py'>
+\end{lstlisting}
+
+\section{Validate \texttt{RADCellSimulation.py} directly}
+
+\begin{lstlisting}
+cd ~/radcell/RADCELL/VascularTumor/Simulation
+
+~/run_radcell_cc3d_python.sh RADCellSimulation.py \
+  "out test_cc3d" \
+  testInputSource
+\end{lstlisting}
+
+Expected signs:
+
+\begin{lstlisting}
+Start calling subprocess RADCellSimulation here
+cellInformation exists: True
+Loaded cells: ...
+Tissue dimensions [mm]: ...
+Geant4 version Name: geant4-11-04...
+runMode: out test_cc3d
+radiationSource: testInputSource.in
+\end{lstlisting}
+
+\section{Validate the CompuCell3D GUI}
+
+\begin{lstlisting}
+cd ~/radcell/RADCELL
+
+~/run_radcell_cc3d_python.sh \
+  ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/cc3d-player5
+\end{lstlisting}
+
+In Player, open:
+
+\begin{lstlisting}
+~/radcell/RADCELL/VascularTumor/VascularTumor.cc3d
+\end{lstlisting}
+
+Expected terminal signs:
+
+\begin{lstlisting}
+CompuCell3D Version: ...
+XML is valid!
+INFO: Random number generator: MersenneTwister
+INFO: Step 0
+INFO: Cells ...
+\end{lstlisting}
+
+\section{Validate headless execution with clean output}
+
+\begin{lstlisting}
+mkdir -p ~/Desktop/radcell_workspace
+cd ~/Desktop/radcell_workspace
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir ~/radcell/RADCELL \
+  --launcher ~/run_radcell_cc3d_python.sh \
+  --timeout 120
+\end{lstlisting}
+
+If the test ends by timeout but prints:
+
+\begin{lstlisting}
+[RADCELL] smoke-test markers:
+  CC3D:    1
+  RADCELL: 0
+  Geant4:  0
+
+[RADCELL] CC3D started correctly.
+[RADCELL] RADCELL/Geant4 was not reached before timeout.
+[RADCELL] smoke test passed before timeout.
+\end{lstlisting}
+
+this is acceptable for a short smoke test, because \texttt{VascularTumor} may trigger radiation only at high MCS.
+
+\chapter{Running \texttt{VascularTumor}}
+
+\section{Run through the GUI}
+
+\begin{enumerate}
+  \item open a terminal;
+  \item launch Player through the launcher;
+  \item open \texttt{VascularTumor.cc3d};
+  \item press \textbf{Run};
+  \item monitor CompuCell3D logs;
+  \item wait for the radiation MCS to see the RADCELL call.
+\end{enumerate}
+
+Command:
+
+\begin{lstlisting}
+cd ~/radcell/RADCELL
+
+~/run_radcell_cc3d_python.sh \
+  ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/cc3d-player5
+\end{lstlisting}
+
+\section{Run headless}
+
+\begin{lstlisting}
+mkdir -p ~/Desktop/radcell_workspace
+cd ~/Desktop/radcell_workspace
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir ~/radcell/RADCELL \
+  --launcher ~/run_radcell_cc3d_python.sh \
+  --timeout 300
+\end{lstlisting}
+
+\section{Run manually with \texttt{cc3d.run\_script}}
+
+\begin{lstlisting}
+~/run_radcell_cc3d_python.sh -m cc3d.run_script \
+  -i ~/radcell/RADCELL/VascularTumor/VascularTumor.cc3d \
+  --output-dir "$PWD/radcell_runs/VascularTumor_manual_test"
+\end{lstlisting}
+
+\section{Run only RADCELL directly}
+
+\begin{lstlisting}
+cd ~/radcell/RADCELL/VascularTumor/Simulation
+
+~/run_radcell_cc3d_python.sh RADCellSimulation.py \
+  "out test_cc3d" \
+  testInputSource
+\end{lstlisting}
+
+This test does not execute the full CompuCell3D dynamics. It verifies whether the RADCELL/Geant4 backend can read the input files and initialize.
+
+\chapter{Modifying and creating new experiments}
+
+\section{General principle}
+
+Do not edit the working base directly when creating an experiment. Use a working copy. The goal is to separate:
+
+\begin{lstlisting}
+functional patched RADCELL        -> stable base
+workspace/radcell_runs/...        -> execution outputs
+workspace/experiments/...         -> modifiable copies
+\end{lstlisting}
+
+Avoid uncontrolled edits in:
+
+\begin{lstlisting}
+~/radcell/RADCELL/VascularTumor/Simulation/
+\end{lstlisting}
+
+Create a copy first:
+
+\begin{lstlisting}
+mkdir -p ~/Desktop/radcell_workspace/experiments
+cp -a ~/radcell/RADCELL/VascularTumor \
+  ~/Desktop/radcell_workspace/experiments/VascularTumor_short_test
+\end{lstlisting}
+
+\section{Files that are usually modified}
+
+\begin{longtable}{p{0.40\textwidth}p{0.52\textwidth}}
+\toprule
+\textbf{File} & \textbf{What it controls} \\
+\midrule
+\endhead
+
+\path{VascularTumor.cc3d} &
+CompuCell3D project file. Points to the XML file and simulation scripts. \\
+
+\path{Simulation/VascularTumor.xml} &
+CompuCell3D parameters: lattice dimensions, number of MCS, plugins, constraints, chemical fields, cell types, and dynamical parameters. \\
+
+\path{Simulation/VascularTumor.py} &
+Modern Python entry point for CompuCell3D. Registers steppables and calls \texttt{CompuCellSetup.run()}. Usually it should not require many changes. \\
+
+\path{Simulation/VascularTumorSteppables.py} &
+Biological/cellular dynamics logic: growth, division, death, state updates, and radiation-module calls at defined MCS values. \\
+
+\path{Simulation/RadiationTransportModule.py} &
+Layer that calls \texttt{RADCellSimulation.py} from CompuCell3D using the current Python interpreter and the configured launcher. \\
+
+\path{Simulation/RADCellSimulation.py} &
+Python script that prepares cell data and invokes functions from the RADCELL/Geant4 wrapper. \\
+
+\path{Simulation/testInputSource.in} &
+Input macro/source file for the Geant4/RADCELL radiation source: particle, energy, position, direction, and number of events. \\
+
+\path{Simulation/cellInformation.csv} &
+Generated/consumed file containing cell information for radiation transport. It may be generated by the simulation or used in direct tests. \\
+
+\bottomrule
+\end{longtable}
+
+\section{Modify the number of MCS steps}
+
+Look for the steps/MCS configuration in the XML. Usually the file is:
+
+\begin{lstlisting}
+Simulation/VascularTumor.xml
+\end{lstlisting}
+
+Use:
+
+\begin{lstlisting}
+grep -n "Steps\|MCS" Simulation/VascularTumor.xml
+\end{lstlisting}
+
+Change the number of steps carefully. For quick tests, use low values; to reproduce the original workflow, preserve the expected schedule.
+
+\section{Modify when radiation is called}
+
+Radiation is triggered inside steppables. The main file is:
+
+\begin{lstlisting}
+Simulation/VascularTumorSteppables.py
+\end{lstlisting}
+
+Search for patterns such as:
+
+\begin{lstlisting}
+grep -n "mcs\|runMode\|simulationID\|Radiation" Simulation/VascularTumorSteppables.py
+\end{lstlisting}
+
+In the original workflow, radiation may be called at high MCS values, such as:
+
+\begin{lstlisting}
+12000, 13000, 14000, 15000, 16000
+\end{lstlisting}
+
+For a short test, make a backup:
+
+\begin{lstlisting}
+cd ~/radcell/RADCELL/VascularTumor/Simulation
+cp VascularTumorSteppables.py VascularTumorSteppables.py.before_short_test
+\end{lstlisting}
+
+Edit the condition to something like:
+
+\begin{lstlisting}
+if mcs == 10:
+    ...
+\end{lstlisting}
+
+Then restore:
+
+\begin{lstlisting}
+mv VascularTumorSteppables.py.before_short_test VascularTumorSteppables.py
+\end{lstlisting}
+
+In an experiment copy, you may keep this change as long as it is clearly documented in the experiment name and manifest.
+
+\section{Modify the run name}
+
+The \texttt{runMode} used by RADCELL has the format:
+
+\begin{lstlisting}
+out <simulationID>
+\end{lstlisting}
+
+In the modern patch, there is a construction similar to:
+
+\begin{lstlisting}
+runMode = 'out'+' ' + self.simulationID
+\end{lstlisting}
+
+The \texttt{out} prefix indicates headless execution. Do not switch to a visual mode if the goal is to use the modern workflow.
+
+The \texttt{simulationID} identifier can be changed to distinguish experiments, for example:
+
+\begin{lstlisting}
+single_MRT_8Gy_test
+single_MRT_8Gy_short_mcs10
+fractionated_MRT_test_001
+\end{lstlisting}
+
+\section{Modify the radiation source}
+
+The typical file is:
+
+\begin{lstlisting}
+Simulation/testInputSource.in
+\end{lstlisting}
+
+It contains Geant4/RADCELL commands for particle, energy, direction, position, and number of events. To locate parameters:
+
+\begin{lstlisting}
+grep -n "particle\|ene\|energy\|beamOn\|pos\|ang" Simulation/testInputSource.in
+\end{lstlisting}
+
+Examples of parameters to modify:
+
+\begin{itemize}
+  \item particle type: \texttt{e-}, \texttt{gamma}, etc.;
+  \item energy: keV/MeV;
+  \item number of particles/events in \texttt{beamOn};
+  \item source position and direction;
+  \item beam geometry, if supported by the macro.
+\end{itemize}
+
+After modifying it, always run a direct test:
+
+\begin{lstlisting}
+cd Simulation
+
+~/run_radcell_cc3d_python.sh RADCellSimulation.py \
+  "out test_source_change" \
+  testInputSource
+\end{lstlisting}
+
+\section{Modify biological parameters}
+
+The biological model appears mainly in:
+
+\begin{lstlisting}
+Simulation/VascularTumor.xml
+Simulation/VascularTumorSteppables.py
+\end{lstlisting}
+
+Parameter types:
+
+\begin{itemize}
+  \item target volume;
+  \item volume/surface lambda;
+  \item cell division;
+  \item death/necrosis;
+  \item growth;
+  \item nutrient diffusion/consumption;
+  \item neighborhood rules;
+  \item radiation response.
+\end{itemize}
+
+To modify safely:
+
+\begin{enumerate}
+  \item create a model copy;
+  \item change one parameter at a time;
+  \item reduce MCS for testing;
+  \item save the log;
+  \item record the diff;
+  \item only then run long experiments.
+\end{enumerate}
+
+\section{Create a new derived experiment}
+
+Recommended structure example:
+
+\begin{lstlisting}
+~/Desktop/radcell_workspace/
+  experiments/
+    VascularTumor_8Gy_mcs10/
+      VascularTumor.cc3d
+      Simulation/
+        VascularTumor.xml
+        VascularTumor.py
+        VascularTumorSteppables.py
+        RadiationTransportModule.py
+        RADCellSimulation.py
+        testInputSource.in
+        README_experiment.md
+  radcell_runs/
+    VascularTumor_cc3d_2026_07_07_21_17_22_e5f1f8/
+      VascularTumor.cc3d
+      cc3d_headless.log
+      run_manifest.json
+\end{lstlisting}
+
+Commands:
+
+\begin{lstlisting}
+mkdir -p ~/Desktop/radcell_workspace/experiments
+
+cp -a ~/radcell/RADCELL/VascularTumor \
+  ~/Desktop/radcell_workspace/experiments/VascularTumor_8Gy_mcs10
+
+cd ~/Desktop/radcell_workspace/experiments/VascularTumor_8Gy_mcs10/Simulation
+# edit files here
+\end{lstlisting}
+
+Run manually:
+
+\begin{lstlisting}
+cd ~/Desktop/radcell_workspace
+
+~/run_radcell_cc3d_python.sh -m cc3d.run_script \
+  -i ~/Desktop/radcell_workspace/experiments/VascularTumor_8Gy_mcs10/VascularTumor.cc3d \
+  --output-dir "$PWD/radcell_runs/VascularTumor_8Gy_mcs10_manual"
+\end{lstlisting}
+
+Note: the current \texttt{run\_vasculartumor\_headless.sh} script was designed for \texttt{VascularTumor} inside a RADCELL checkout. For derived experiments in another directory, it may be preferable to use the manual \texttt{cc3d.run\_script} command until a generalized helper exists.
+
+\section{What to document in each experiment}
+
+Create a \texttt{README\_experiment.md} file with:
+
+\begin{itemize}
+  \item experiment name;
+  \item commit/tag of \texttt{geant4-native-radcell};
+  \item path to the RADCELL checkout used;
+  \item launcher path;
+  \item Geant4 version;
+  \item CompuCell3D version;
+  \item XML changes;
+  \item steppable changes;
+  \item changes to the \texttt{.in} source;
+  \item radiation MCS;
+  \item planned dose/source;
+  \item command used to run;
+  \item output location.
+\end{itemize}
+
+\chapter{Good execution practices}
+
+\section{Do not use global \texttt{LD\_PRELOAD}}
+
+Do not place Geant4/RADCELL libraries in:
+
+\begin{lstlisting}
+~/.bashrc
+~/.profile
+/etc/environment
+/etc/ld.so.preload
+\end{lstlisting}
+
+Always use:
+
+\begin{lstlisting}
+~/run_radcell_cc3d_python.sh <command>
+\end{lstlisting}
+
+\section{Do not run experiments inside the repository root}
+
+Avoid:
+
+\begin{lstlisting}
+cd ~/Desktop/working_on/new/geant4-native-radcell
+scripts/run_vasculartumor_headless.sh
+\end{lstlisting}
+
+Prefer:
+
+\begin{lstlisting}
+mkdir -p ~/Desktop/radcell_workspace
+cd ~/Desktop/radcell_workspace
+
+~/Desktop/working_on/new/geant4-native-radcell/scripts/run_vasculartumor_headless.sh
+\end{lstlisting}
+
+\section{Control runtime}
+
+For smoke tests:
+
+\begin{lstlisting}
+--timeout 30
+--timeout 60
+--timeout 120
+\end{lstlisting}
+
+To try to reach RADCELL/Geant4 in the full workflow:
+
+\begin{lstlisting}
+--timeout 300
+--timeout 600
+\end{lstlisting}
+
+For production, it may be better to run manually without a timeout using \texttt{tmux} or \texttt{screen}, while keeping the output explicit.
+
+\section{Interpret \texttt{Ctrl+C} and \texttt{Ctrl+Z}}
+
+\texttt{Ctrl+C} sends an interrupt. In C++/Geant4 loops, it may not stop immediately.
+
+\texttt{Ctrl+Z} suspends the process; it does not kill it. Then use:
+
+\begin{lstlisting}
+jobs -l
+kill %1
+# if necessary:
+kill -9 %1
+\end{lstlisting}
+
+For tests, prefer \texttt{timeout}.
+
+\chapter{Troubleshooting}
+
+\section{\texttt{ModuleNotFoundError: No module named 'radcell'}}
+
+Probable causes:
+
+\begin{itemize}
+  \item RADCELL was not installed under \path{~/.local/radcell};
+  \item the launcher is not setting \texttt{PYTHONPATH};
+  \item Python was run directly instead of through the launcher.
+\end{itemize}
+
+Test:
+
+\begin{lstlisting}
+ls ~/.local/radcell/bin
+~/run_radcell_cc3d_python.sh -c "import radcell; print(radcell)"
+\end{lstlisting}
+
+\section{\texttt{\_radcell.so: cannot open shared object file}}
+
+Probable causes:
+
+\begin{itemize}
+  \item \texttt{LD\_LIBRARY\_PATH} does not include \path{~/.local/radcell/bin};
+  \item the launcher was not used;
+  \item RADCELL was not installed correctly.
+\end{itemize}
+
+Use the launcher.
+
+\section{TLS/static TLS block error}
+
+This error may occur when loading Geant4/RADCELL libraries into Python. The launcher resolves it by using local \texttt{LD\_PRELOAD} with \texttt{libG4*.so} libraries. Do not export this globally.
+
+\section{\texttt{/vis/open OGL} or \texttt{vis.mac}}
+
+In \texttt{v0.4.1+}, these errors indicate a problem:
+
+\begin{lstlisting}
+COMMAND NOT FOUND </vis/open OGL 600x400-0+0>
+Can not open a macro file <vis.mac>
+\end{lstlisting}
+
+Possible causes:
+
+\begin{itemize}
+  \item patch not applied;
+  \item patch partially applied;
+  \item RADCELL not rebuilt after patching;
+  \item old checkout being used.
+\end{itemize}
+
+Correction:
+
+\begin{lstlisting}
+./scripts/apply_radcell_patch.sh ~/radcell/RADCELL
+./scripts/verify_radcell_compat.sh ~/radcell/RADCELL
+./scripts/build_radcell.sh ~/radcell/RADCELL \
+  ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python
+\end{lstlisting}
+
+\section{\texttt{Could NOT find SWIG}}
+
+Install:
+
+\begin{lstlisting}
+sudo apt install -y swig
+\end{lstlisting}
+
+\section{\texttt{PyString\_FromString} or \texttt{PyInt\_AsLong}}
+
+This indicates non-modernized Python 2-era code. The patch probably was not applied.
+
+\begin{lstlisting}
+./scripts/apply_radcell_patch.sh ~/radcell/RADCELL
+./scripts/verify_radcell_compat.sh ~/radcell/RADCELL
+\end{lstlisting}
+
+\section{\texttt{G4MTRunManager does not name a type}}
+
+This indicates incompatibility with Geant4 11 or an incomplete patch.
+
+\section{Headless smoke test starts CC3D but does not reach RADCELL}
+
+This can be normal. The radiation schedule may be set at high MCS. Increase the timeout:
+
+\begin{lstlisting}
+--timeout 300
+\end{lstlisting}
+
+or temporarily change the radiation MCS for a short test.
+
+\chapter{Recommended workflows}
+
+\section{Quick workflow on a clean PC}
+
+\begin{lstlisting}
+sudo apt update
+sudo apt install -y git build-essential cmake ninja-build make gcc g++ swig \
+  python3 python3-venv python3-pip wget curl ca-certificates pkg-config \
+  libxerces-c-dev libcurl4-openssl-dev libssl-dev libglu1-mesa \
+  qt6-base-dev libqt6opengl6-dev libexpat1-dev zlib1g-dev libfreetype-dev \
+  libx11-dev libxext-dev libxmu-dev libxi-dev
+
+# install CompuCell3D separately
+
+git clone https://github.com/luis-gustta/geant4-native-radcell.git
+cd geant4-native-radcell
+
+./scripts/setup_radcell_stack.sh \
+  --workdir ~/radcell \
+  --cc3d-python ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python \
+  --yes
+
+~/run_radcell_cc3d_python.sh -c "import radcell; print(radcell)"
+
+mkdir -p ~/Desktop/radcell_workspace
+cd ~/Desktop/radcell_workspace
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir ~/radcell/RADCELL \
+  --launcher ~/run_radcell_cc3d_python.sh \
+  --timeout 120
+\end{lstlisting}
+
+\section{Workflow for testing only Geant4}
+
+\begin{lstlisting}
+chmod +x install_geant4_native.sh
+./install_geant4_native.sh --deb --version 11.4.2 --jobs 4
+
+sudo apt install ~/.cache/geant4-native-build/packages/geant4-native_11.4.2-1_amd64.deb
+
+source /opt/geant4/11.4.2/bin/geant4.sh
+geant4-config --version
+\end{lstlisting}
+
+\section{Workflow for developing an experiment}
+
+\begin{lstlisting}
+mkdir -p ~/Desktop/radcell_workspace/experiments
+cp -a ~/radcell/RADCELL/VascularTumor \
+  ~/Desktop/radcell_workspace/experiments/VascularTumor_my_test
+
+cd ~/Desktop/radcell_workspace/experiments/VascularTumor_my_test/Simulation
+
+cp VascularTumorSteppables.py VascularTumorSteppables.py.bak
+cp testInputSource.in testInputSource.in.bak
+
+# edit XML, steppables, and source
+
+cd ~/Desktop/radcell_workspace
+
+~/run_radcell_cc3d_python.sh -m cc3d.run_script \
+  -i ~/Desktop/radcell_workspace/experiments/VascularTumor_my_test/VascularTumor.cc3d \
+  --output-dir "$PWD/radcell_runs/VascularTumor_my_test"
+\end{lstlisting}
+
+\chapter{Current limits and next steps}
+
+\section{Limits}
+
+The repository already allows users to install, patch, build, validate, and run the \texttt{VascularTumor} workflow. However:
+
+\begin{itemize}
+  \item CompuCell3D installation is still external;
+  \item modifying experiments still requires manual XML/Python/macro editing;
+  \item there is not yet a \texttt{scenario.yaml} format;
+  \item the headless helper is specific to \texttt{VascularTumor};
+  \item Docker tests do not replace a real Linux Mint/Ubuntu VM test with GUI.
+\end{itemize}
+
+\section{Possible next steps}
+
+\begin{enumerate}
+  \item add a system-dependency script for Ubuntu/Mint;
+  \item create \texttt{doctor\_fresh\_system.sh};
+  \item generalize \texttt{run\_vasculartumor\_headless.sh} to accept any \texttt{.cc3d};
+  \item create documented short experiment examples;
+  \item create a future \texttt{scenario.yaml} layer in another project or in a separate sublayer;
+  \item test on a clean Linux Mint VM.
+\end{enumerate}
+
+\chapter{Final checklist}
+
+\section{Installation checklist}
+
+\begin{lstlisting}
+[ ] apt dependencies installed.
+[ ] CompuCell3D installed.
+[ ] CompuCell3D Python located.
+[ ] geant4-native-radcell cloned.
+[ ] setup_radcell_stack.sh executed.
+[ ] RADCELL cloned under ~/radcell/RADCELL.
+[ ] Patch applied.
+[ ] verify_radcell_compat.sh passed.
+[ ] RADCELL built.
+[ ] Launcher created.
+[ ] import radcell passed.
+\end{lstlisting}
+
+\section{Execution checklist}
+
+\begin{lstlisting}
+[ ] RADCellSimulation.py runs directly.
+[ ] Geant4 prints version in the direct test.
+[ ] CompuCell3D Player opens through the launcher.
+[ ] VascularTumor.cc3d opens.
+[ ] Headless smoke test starts CC3D.
+[ ] No /vis/open OGL error appears.
+[ ] Outputs appear under $PWD/radcell_runs/.
+[ ] run_manifest.json was created.
+\end{lstlisting}
+
+\section{New experiment checklist}
+
+\begin{lstlisting}
+[ ] Experiment created in a separate copy.
+[ ] README_experiment.md created.
+[ ] XML modified in a documented way.
+[ ] Steppables modified in a documented way.
+[ ] .in source modified in a documented way.
+[ ] Radiation MCS documented.
+[ ] Short test executed.
+[ ] Log saved.
+[ ] Output isolated under radcell_runs/.
+[ ] Patched RADCELL base preserved.
+\end{lstlisting}
+
+\chapter{Minimal validation example}
+
+\section{Why this example exists}
+
+In addition to the full \texttt{VascularTumor} workflow, the repository contains an example under \path{examples/radcell_minimal/}. It does not create a new radiobiological model and does not replace the original RADCELL examples. Its function is narrower: to validate that the launcher exists, that Python can import \texttt{radcell}, that the essential files under \texttt{VascularTumor/Simulation} are present, and that \texttt{RADCellSimulation.py} reaches RADCELL/Geant4 initialization.
+
+\section{Recommended command}
+
+From the repository root:
+
+\begin{lstlisting}
+examples/radcell_minimal/run_validation.sh
+\end{lstlisting}
+
+With explicit paths:
+
+\begin{lstlisting}
+examples/radcell_minimal/run_validation.sh \
+  --radcell-root /path/to/RADCELL \
+  --launcher /path/to/run_radcell_cc3d_python.sh \
+  --log-dir ./radcell_validation_logs \
+  --timeout 300
+\end{lstlisting}
+
+The script should find:
+
+\begin{lstlisting}
+RADCELL_ROOT/VascularTumor/Simulation/RADCellSimulation.py
+RADCELL_ROOT/VascularTumor/Simulation/testInputSource.in
+RADCELL_ROOT/VascularTumor/Simulation/cellInformation.csv
+\end{lstlisting}
+
+Expected success criteria:
+
+\begin{lstlisting}
+[PASS] Python can import radcell through the launcher
+[PASS] Direct run reached RADCELL/Geant4 startup
+[PASS] Minimal RADCELL validation finished
+\end{lstlisting}
+
+\section{What it does not validate}
+
+This test does not validate:
+
+\begin{itemize}
+  \item physical accuracy of Geant4 transport;
+  \item biological validity of the damage/survival model;
+  \item the full high-MCS CompuCell3D workflow;
+  \item statistical dose or damage response;
+  \item robustness of a production experiment.
+\end{itemize}
+
+It should be used as a wiring test, not as a scientific benchmark.
+
+\chapter{Readiness criteria for external users}
+
+\section{What ready means}
+
+To claim that the repository is useful for someone to download on a clean PC, run, and execute \texttt{VascularTumor}, the following criteria are reasonable:
+
+\begin{enumerate}
+  \item the README describes the installation flow without depending on tacit knowledge;
+  \item the automatic script installs or detects Geant4, applies the patch, builds RADCELL, creates the launcher, and tests the import;
+  \item the user can run \texttt{examples/radcell\_minimal/run\_validation.sh};
+  \item the user can open \texttt{VascularTumor.cc3d} through CompuCell3D Player loaded by the launcher;
+  \item the headless smoke test creates \texttt{cc3d\_headless.log} and \texttt{run\_manifest.json};
+  \item logs make clear whether the test reached only CC3D or reached RADCELL/Geant4;
+  \item old Geant4 visualization errors are rejected by the verifier;
+  \item outputs do not pollute the repository root.
+\end{enumerate}
+
+\section{What still is not demonstrated}
+
+Even if all criteria above pass, the following are still not demonstrated:
+
+\begin{itemize}
+  \item physical validity of the source, energy, geometry, material, and scoring;
+  \item radiobiological validity of the damage/survival model;
+  \item statistical convergence with the number of particles/events;
+  \item sensitivity to random seeds and run-to-run variation;
+  \item full reproducibility on a non-Ubuntu/Mint Linux distribution;
+  \item quantitative equivalence to the original RADCELL publications.
+\end{itemize}
+
+\chapter{Relationship between Geant4, TOPAS, and RADCELL}
+
+\section{Geant4}
+
+Geant4 is the Monte Carlo toolkit. It provides libraries, physical processes, geometries, materials, sources, and tracking infrastructure. In return, the user must compile or run an application that uses these libraries.
+
+\section{TOPAS}
+
+TOPAS is a higher-level layer built on top of Geant4 and widely used in medical physics. It reduces the amount of C++ required to define sources, geometries, and scorers, but adds its own installation, access/licensing, and integration layer.
+
+\section{RADCELL}
+
+RADCELL is a specific workflow that couples a multicellular CompuCell3D model to a Geant4-based transport backend. Its value is not replacing Geant4; its value is connecting cellular states, geometries, and input files to dose/damage simulation in the context of the \texttt{VascularTumor} model.
+
+\section{Why this repository does not simply use TOPAS}
+
+TOPAS can be useful for radiotherapy workflows, but it does not automatically solve integration with CompuCell3D, the format expected by RADCELL, the existing Python wrapper, or the licensing/redistribution problem of the original RADCELL code. This repository first solves the original RADCELL route using native Geant4. A TOPAS route would be a different backend and would require its own design.
+
+\chapter{License and redistribution notes}
+
+\section{License of this repository}
+
+The scripts, patches, and documentation in this repository are published under the MIT License, according to \path{LICENSE}. This does not alter the licenses of Geant4, Geant4 datasets, CompuCell3D, TOPAS, or RADCELL.
+
+\section{RADCELL is not redistributed}
+
+This repository does not include the RADCELL source code. The conservative interpretation is that the public RADCELL code should not be copied, sold, redistributed, forked with modifications, or incorporated into another project without an explicit license or permission from the authors. The path used here is to distribute a patch and scripts that the user applies locally to a separately obtained checkout.
+
+\section{Geant4 and datasets}
+
+The \texttt{.deb} package generated by this project may include Geant4 libraries and datasets. When distributing this package as a release asset, preserve upstream license notices, metadata, and attributions.
+
+\chapter{Useful inspection commands}
+
+\section{Check Git state}
+
+\begin{lstlisting}
+git status --short
+git log --oneline --decorate -10
+git tag --list --sort=version:refname
+\end{lstlisting}
+
+\section{Check generated files}
+
+\begin{lstlisting}
+find ~/Desktop/radcell_workspace/radcell_runs -maxdepth 2 -type f | sort
+\end{lstlisting}
+
+\section{Inspect logs}
+
+\begin{lstlisting}
+grep -n "RADCELL\|Geant4\|runMode\|radiationSource\|ERROR\|Traceback" \
+  ~/Desktop/radcell_workspace/radcell_runs/*/cc3d_headless.log
+\end{lstlisting}
+
+\section{Check whether the launcher uses the correct Python interpreter}
+
+\begin{lstlisting}
+~/run_radcell_cc3d_python.sh - <<'PY'
+import sys
+print(sys.executable)
+print(sys.version)
+PY
+\end{lstlisting}
+
+\chapter{Sources consulted}
+
+\begin{itemize}
+  \item \href{https://github.com/luis-gustta/geant4-native-radcell}{Public project repository}.
+  \item \href{https://raw.githubusercontent.com/luis-gustta/geant4-native-radcell/main/README.md}{README on \texttt{main}}.
+  \item \href{https://raw.githubusercontent.com/luis-gustta/geant4-native-radcell/main/docs/INSTALLATION.md}{\texttt{docs/INSTALLATION.md}}.
+  \item \href{https://raw.githubusercontent.com/luis-gustta/geant4-native-radcell/main/docs/radcell_first_run.md}{\texttt{docs/radcell\_first\_run.md}}.
+  \item \href{https://raw.githubusercontent.com/luis-gustta/geant4-native-radcell/main/docs/MOTIVATION.md}{\texttt{docs/MOTIVATION.md}}.
+  \item \href{https://raw.githubusercontent.com/luis-gustta/geant4-native-radcell/main/docs/RADCELL_REMAKE_STRATEGY.md}{\texttt{docs/RADCELL\_REMAKE\_STRATEGY.md}}.
+  \item \href{https://raw.githubusercontent.com/luis-gustta/geant4-native-radcell/main/examples/radcell_minimal/README.md}{\texttt{examples/radcell\_minimal/README.md}}.
+  \item \href{https://raw.githubusercontent.com/luis-gustta/geant4-native-radcell/main/THIRD_PARTY_NOTICES.md}{\texttt{THIRD\_PARTY\_NOTICES.md}}.
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,107 @@
+name: Installation failure
+description: Report a failure during Geant4/RADCELL/CompuCell3D setup
+title: "Installation failure: "
+labels: [installation, bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for failures in dependency installation, Geant4 setup, RADCELL patching, RADCELL build, launcher creation, or `import radcell`.
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Example: Ubuntu 24.04.1, Linux Mint 22, etc.
+      placeholder: "Ubuntu 24.04.1"
+    validations:
+      required: true
+
+  - type: input
+    id: repo-version
+    attributes:
+      label: geant4-native-radcell version or commit
+      placeholder: "v0.4.2 or commit hash"
+    validations:
+      required: true
+
+  - type: input
+    id: geant4-prefix
+    attributes:
+      label: Geant4 prefix
+      placeholder: "/opt/geant4/11.4.2"
+    validations:
+      required: false
+
+  - type: input
+    id: geant4-version
+    attributes:
+      label: Geant4 version
+      description: Output of `geant4-config --version` if available.
+      placeholder: "11.4.2"
+    validations:
+      required: false
+
+  - type: input
+    id: cc3d-python
+    attributes:
+      label: CompuCell3D Python path
+      placeholder: "~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python"
+    validations:
+      required: true
+
+  - type: input
+    id: radcell-path
+    attributes:
+      label: Local RADCELL checkout path
+      placeholder: "~/radcell/RADCELL"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Failure phase
+      options:
+        - system dependencies
+        - Geant4 install
+        - Geant4 package install
+        - RADCELL clone
+        - RADCELL patch
+        - patch verification
+        - RADCELL build
+        - launcher creation
+        - import radcell
+        - direct RADCellSimulation.py run
+        - headless VascularTumor smoke test
+        - CompuCell3D GUI launch
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command
+      description: Paste the exact command that failed.
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output or log excerpt
+      description: Paste only the relevant error region. Prefer attaching full logs separately if they are long.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic commands already tried
+      description: Include outputs from commands such as `geant4-config --version`, `verify_radcell_compat.sh`, or `~/run_radcell_cc3d_python.sh -c "import radcell"`.
+      render: text
+    validations:
+      required: false

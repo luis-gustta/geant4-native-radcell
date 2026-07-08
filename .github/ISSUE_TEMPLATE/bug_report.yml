@@ -1,0 +1,61 @@
+name: Bug report
+description: Report an unexpected behavior in scripts, documentation, or repository workflow
+title: "Bug: "
+labels: [bug]
+body:
+  - type: input
+    id: repo-version
+    attributes:
+      label: geant4-native-radcell version or commit
+      placeholder: "v0.4.2 or commit hash"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - README/documentation
+        - install_geant4_native.sh
+        - setup_radcell_stack.sh
+        - apply_radcell_patch.sh
+        - verify_radcell_compat.sh
+        - build_radcell.sh
+        - create_radcell_launcher.sh
+        - run_vasculartumor_headless.sh
+        - RADCELL compatibility patch
+        - release workflow
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction steps
+      render: bash
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      render: text
+    validations:
+      required: false
