@@ -17,7 +17,8 @@ The immediate motivation is practical: RADCELL depends on Geant4, but its upstre
   - automated RADCELL stack setup;
   - applying the RADCELL compatibility patch;
   - building and installing RADCELL;
-  - creating a launcher for RADCELL + CompuCell3D workflows.
+  - creating a launcher for RADCELL + CompuCell3D workflows;
+  - running a headless `VascularTumor` smoke test with clean output directories.
 
 The intended runtime model is:
 
@@ -93,6 +94,57 @@ For non-interactive setup:
 ~/radcell/RADCELL
 ```
 
+## Fresh Ubuntu / Linux Mint workflow
+
+On a fresh Ubuntu or Linux Mint machine, the intended high-level flow is:
+
+```text
+install system dependencies
+install CompuCell3D
+clone this repository
+run setup_radcell_stack.sh
+validate import radcell
+run the VascularTumor smoke test
+```
+
+A typical setup session is:
+
+```bash
+git clone https://github.com/luis-gustta/geant4-native-radcell.git
+cd geant4-native-radcell
+
+./scripts/setup_radcell_stack.sh \
+  --workdir ~/radcell \
+  --cc3d-python ~/CompuCell3D/miniforge3/envs/cc3d_env/bin/python \
+  --yes
+```
+
+After setup, validate the runtime launcher:
+
+```bash
+~/run_radcell_cc3d_python.sh -c "import radcell; print(radcell)"
+```
+
+Then run the headless `VascularTumor` smoke test from a working directory of your choice:
+
+```bash
+mkdir -p ~/Desktop/simulacoes
+cd ~/Desktop/simulacoes
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir ~/radcell/RADCELL \
+  --launcher ~/run_radcell_cc3d_python.sh
+```
+
+By default, outputs are written under the directory where the command was called:
+
+```text
+$PWD/radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
+```
+
+This keeps simulation outputs out of the `geant4-native-radcell` repository and out of the RADCELL source tree.
+
+
 ## Manual/debug setup
 
 The individual scripts are still available for debugging or controlled step-by-step installation:
@@ -124,6 +176,9 @@ Use this path when you need to isolate a specific failure such as patch applicat
 
 - `scripts/create_radcell_launcher.sh`
   - creates `~/run_radcell_cc3d_python.sh`, a launcher that loads Geant4, RADCELL, and the required runtime library paths.
+
+- `scripts/run_vasculartumor_headless.sh`
+  - runs a short headless CompuCell3D `VascularTumor` smoke test through the RADCELL launcher and writes outputs to `$PWD/radcell_runs/`.
 
 - `scripts/upload-release.sh`
   - helper script to create a GitHub release and upload the `.deb` as a release asset.
@@ -244,6 +299,29 @@ For the full installation procedure, see:
 docs/radcell_installation_v0.md
 ```
 
+For first-run validation after setup, including launcher import tests, direct `RADCellSimulation.py` checks, CompuCell3D GUI launch, and the headless `VascularTumor` smoke-test helper, see:
+
+```text
+docs/radcell_first_run.md
+```
+
+A typical headless smoke test can be launched from any working directory:
+
+```bash
+mkdir -p ~/Desktop/simulacoes
+cd ~/Desktop/simulacoes
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir ~/radcell/RADCELL \
+  --launcher ~/run_radcell_cc3d_python.sh
+```
+
+By default, outputs are written to:
+
+```text
+$PWD/radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
+```
+
 ## Runtime launcher and `LD_PRELOAD`
 
 RADCELL may require Geant4 libraries to be preloaded when imported from Python. The launcher created by `scripts/create_radcell_launcher.sh` handles this locally for the launched process.
@@ -270,6 +348,25 @@ not:
 ```bash
 export LD_PRELOAD=/opt/geant4/11.4.2/lib/...
 ```
+
+## Output directory policy
+
+Helper scripts should not write simulation outputs into the root of this repository by default.
+
+For `scripts/run_vasculartumor_headless.sh`, the default output layout is:
+
+```text
+$PWD/radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
+```
+
+This means the user controls the experiment workspace by choosing where to call the command from:
+
+```bash
+cd ~/Desktop/simulacoes
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh ...
+```
+
+The RADCELL source tree, CompuCell3D installation, and `geant4-native-radcell` repository can remain elsewhere.
 
 ## Release the `.deb`
 
