@@ -172,7 +172,7 @@ The exact number of loaded cells depends on the current `cellInformation.csv`.
 
 ---
 
-## 5. Warnings that are usually not fatal
+## 5. Warnings and errors
 
 Some Geant4 warnings may appear during the direct test.
 
@@ -186,7 +186,7 @@ This is just a warning message.
 
 This warning is usually not fatal.
 
-You may also see visualization-related warnings such as:
+However, with the modern `v0.4.1+` compatibility workflow, visualization-related messages such as:
 
 ```text
 COMMAND NOT FOUND </vis/open OGL 600x400-0+0>
@@ -198,9 +198,11 @@ or:
 Can not open a macro file <vis.mac>
 ```
 
-In this compatibility workflow, the Geant4/RADCELL backend is expected to run without its own Qt/OpenGL visualization window. These messages are not necessarily fatal if the simulation continues into the physics setup and prints the run mode and radiation source.
+should be treated as signs of an old or incomplete compatibility patch.
 
-Fatal errors usually look different:
+The Geant4/RADCELL backend is expected to run headlessly. CompuCell3D may still use its own GUI, but RADCELL should not try to open a separate Geant4 Qt/OpenGL window during the headless backend call.
+
+Fatal errors usually include:
 
 - Python traceback;
 - segmentation fault;
@@ -208,7 +210,9 @@ Fatal errors usually look different:
 - missing Geant4 libraries;
 - missing input source file;
 - failure to read `cellInformation.csv`;
-- process exits before printing `runMode`.
+- process exits before printing `runMode`;
+- old Geant4 visualization/OpenGL errors in a `v0.4.1+` workflow.
+
 
 ---
 
@@ -309,19 +313,56 @@ This confirms that:
 
 ---
 
-## 9. Headless CompuCell3D run
+## 9. Recommended headless CompuCell3D smoke test
 
-For SSH, tmux, or non-GUI runs:
+For SSH, tmux, or non-GUI runs, prefer the repository helper script:
+
+```bash
+mkdir -p ~/Desktop/simulacoes
+cd ~/Desktop/simulacoes
+
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir "$RADCELL_ROOT" \
+  --launcher "$RADCELL_LAUNCHER"
+```
+
+By default, the script writes outputs under the directory where it was called:
+
+```text
+$PWD/radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
+```
+
+Each run directory contains at least:
+
+```text
+VascularTumor.cc3d
+cc3d_headless.log
+run_manifest.json
+```
+
+This keeps simulation outputs out of the `geant4-native-radcell` repository and out of the RADCELL source tree.
+
+The script validates that CompuCell3D starts correctly. If the timeout is reached before the radiation step, the smoke test can still pass as long as CompuCell3D initialized successfully and no old Geant4 visualization/OpenGL error was found.
+
+If you specifically want to observe the RADCELL/Geant4 call from the full `VascularTumor` workflow, increase the timeout:
+
+```bash
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir "$RADCELL_ROOT" \
+  --launcher "$RADCELL_LAUNCHER" \
+  --timeout 300
+```
+
+Manual equivalent:
 
 ```bash
 "$RADCELL_LAUNCHER" -m cc3d.run_script \
   -i "$RADCELL_ROOT/VascularTumor/VascularTumor.cc3d" \
-  --output-dir "$HOME/radcell_cc3d_outputs/VascularTumor_test"
+  --output-dir "$PWD/radcell_runs/VascularTumor_manual_test"
 ```
 
-Use an output directory outside the simulation directory.
-
 If this command starts but never reaches RADCELL, check the radiation schedule. The simulation may not have reached the required MCS yet.
+
 
 ---
 
