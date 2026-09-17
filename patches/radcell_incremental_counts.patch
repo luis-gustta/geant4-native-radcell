@@ -1,0 +1,42 @@
+--- a/VascularTumor/Simulation/VascularTumorSteppables.py
++++ b/VascularTumor/Simulation/VascularTumorSteppables.py
+@@ -192,6 +192,8 @@
+         self.numberOfVascularCellList.append(numberOfVascularCells)
+         self.numberOfNeovascularCellList.append(numberOfNeovascularCells)
+         self.numberOfNecroticCellList.append(numberOfNecroticCells)
++        self._record_cell_counts(mcs, numberOfTumorCells, numberOfVascularCells,
++                                 numberOfNeovascularCells, numberOfNecroticCells)
+ 
+         self.pW.addDataPoint("Tumor Cells", mcs,numberOfTumorCells)
+         self.pW.addDataPoint("Vascular Cells", mcs,numberOfVascularCells)
+@@ -199,14 +201,23 @@
+         self.pW.addDataPoint("Necrotic Cells",mcs,numberOfNecroticCells)
+ 
+ 
++    def _record_cell_counts(self, mcs, tumor, vascular, neovascular, necrotic):
++        # Preserve the existing five-column format and the actual MCS.
++        self.cellNumberFileOut.write(
++            '{0:d},{1:d},{2:d},{3:d},{4:d}\n'.format(
++                mcs, tumor, vascular, neovascular, necrotic))
++        self.cellNumberFileOut.flush()
++
++    def _close_cell_counts(self):
++        if not self.cellNumberFileOut.closed:
++            self.cellNumberFileOut.flush()
++            self.cellNumberFileOut.close()
++
+     def finish(self):
+-        print('the number of tumor  cells',self.numberOfTumorCellList)
+-        for index,i in enumerate( self.numberOfTumorCellList):
+-            vascularNum = self.numberOfVascularCellList[index]
+-            neovascularNum = self.numberOfNeovascularCellList[index]
+-            necroticNum = self.numberOfNecroticCellList[index]
+-            self.cellNumberFileOut.write('{0:d},{1:d},{2:d},{3:d},{4:d}\n'.format(index,i,vascularNum,neovascularNum,necroticNum)) # save the tumor cell number for each MCS
+-        self.cellNumberFileOut.close()
++        self._close_cell_counts()
++
++    def on_stop(self):
++        self._close_cell_counts()
+ 
+ 
+ class MitosisSteppable(MitosisSteppableBase):
