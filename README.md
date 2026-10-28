@@ -35,7 +35,7 @@ The Geant4/RADCELL backend is built without its own Geant4 Qt/OpenGL visualizati
 
 For a clean Ubuntu/Mint setup, this repository includes a helper script for running the original RADCELL `VascularTumor` example in headless CompuCell3D mode.
 
-The smoke test verifies that the native Geant4/RADCELL/CompuCell3D stack can run before larger workflows.
+The default smoke test checks that CompuCell3D completes without a fatal error; it does **not** certify that irradiation occurred. Use `--integration-test` to exercise the complete CC3D -> RADCELL -> Geant4 -> CC3D chain in an isolated 20-MCS copy of the experiment.
 
 Run it from a working directory outside this repository:
 
@@ -56,6 +56,20 @@ Each run writes at least:
 
 - `cc3d_headless.log`
 - `run_manifest.json`
+
+To validate the complete radiation roundtrip without modifying the original
+scientific model:
+
+```bash
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \\
+  --radcell-dir ~/radcell/RADCELL \\
+  --launcher ~/run_radcell_cc3d_python.sh \\
+  --integration-test --timeout 900
+```
+
+A timeout or Python traceback is a nonzero-result failure; it is no longer
+reported as `smoke test passed`. This is an operational integration test,
+not a dosimetry or biological-model validation.
 
 See the full walkthrough in [`docs/radcell_first_run.md`](docs/radcell_first_run.md).
 

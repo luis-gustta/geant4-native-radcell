@@ -19,8 +19,11 @@ Options:
   --output-dir PATH      Directory where run entries are created.
                          Default: $PWD/radcell_runs
 
-  --timeout SECONDS      Maximum runtime for this smoke test.
-                         Default: 120
+  --timeout SECONDS      Maximum runtime (default 120 for startup,
+                         900 for --integration-test).
+
+  --integration-test     Copy VascularTumor, run 20 MCS, irradiate at MCS 10,
+                         and require full CC3D/RADCELL/Geant4 integration.
 
   --help                 Show this help.
 
@@ -36,6 +39,7 @@ Example:
 USAGE
 }
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CALL_DIR="$(pwd)"
 RADCELL_DIR="$HOME/radcell/RADCELL"
 CC3D_PYTHON="$HOME/CompuCell3D/miniforge3/envs/cc3d_env/bin/python"
@@ -43,6 +47,9 @@ LAUNCHER="$HOME/run_radcell_cc3d_python.sh"
 OUTPUT_BASE="$CALL_DIR/radcell_runs"
 TIMEOUT_SECONDS="120"
 MODEL="VascularTumor"
+INTEGRATION_TEST=0
+TIMEOUT_EXPLICIT=0
+TEST_MODEL_DIR=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -64,7 +71,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     --timeout)
       TIMEOUT_SECONDS="$2"
+      TIMEOUT_EXPLICIT=1
       shift 2
+      ;;
+    --integration-test)
+      INTEGRATION_TEST=1
+      shift
       ;;
     --help|-h)
       usage
@@ -77,6 +89,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$INTEGRATION_TEST" -eq 1 && "$TIMEOUT_EXPLICIT" -eq 0 ]]; then
+  TIMEOUT_SECONDS=900
+fi
+if ! [[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[ERROR] --timeout must be a positive integer." >&2
+  exit 2
+fi
 
 RADCELL_DIR="$(realpath -m "$RADCELL_DIR")"
 CC3D_PYTHON="$(realpath -m "$CC3D_PYTHON")"
@@ -124,6 +144,18 @@ MANIFEST="$RUN_DIR/run_manifest.json"
 
 mkdir -p "$RUN_DIR"
 
+if [[ "$INTEGRATION_TEST" -eq 1 ]]; then
+  TEST_MODEL_DIR="$RUN_DIR/model/$MODEL"
+  if ! python3 "$SCRIPT_DIR/prepare_vasculartumor_integration.py" \
+    --source "$RADCELL_DIR/$MODEL" \
+    --destination "$TEST_MODEL_DIR" \
+    --steps 20 --radiation-mcs 10; then
+    echo "[ERROR] Could not prepare isolated integration model." >&2
+    exit 2
+  fi
+  CC3D_FILE="$TEST_MODEL_DIR/$MODEL.cc3d"
+fi
+
 cat > "$MANIFEST" <<JSON
 {
   "model": "$MODEL",
@@ -136,7 +168,8 @@ cat > "$MANIFEST" <<JSON
   "cc3d_file": "$CC3D_FILE",
   "output_base": "$OUTPUT_BASE",
   "run_dir": "$RUN_DIR",
-  "timeout_seconds": $TIMEOUT_SECONDS
+  "timeout_seconds": $TIMEOUT_SECONDS,
+  "integration_test": $INTEGRATION_TEST
 }
 JSON
 
@@ -152,52 +185,61 @@ echo
 
 validate_smoke_log() {
   local log_file="$1"
+  local cc3d_ok=0 geant4_ok=0 radcell_ok=0 completed_ok=0
+  local events_ok=0 dose_ok=0 damage_ok=0 records_ok=0
 
-  if grep -Eq "COMMAND NOT FOUND </vis/open|/vis/open OGL|Can not open a macro file <vis\.mac>" "$log_file"; then
-    echo "[ERROR] Found the old Geant4 visualization/OpenGL error in the log."
-    echo "[ERROR] This RADCELL tree may not have the v0.4.1 headless patch applied."
+  # CC3D can print a Python traceback and still return status zero.
+  # Ordinary Geant4 warnings (e.g. ProcCuts110) are not fatal.
+  if grep -Eq 'Traceback \(most recent call last\)|(^|[[:space:]])(PermissionError|ModuleNotFoundError|ImportError|FileNotFoundError|SyntaxError|RuntimeError|NameError):|Segmentation fault|terminate called after throwing|COMMAND NOT FOUND </vis/open|Can not open a macro file <vis\.mac>' "$log_file"; then
+    echo "[FAIL] Fatal Python/Geant4 marker in $log_file" >&2
     return 1
   fi
 
-  local cc3d_ok=0
-  local radcell_ok=0
-  local geant4_ok=0
+  if grep -q 'XML is valid!' "$log_file"; then cc3d_ok=1; fi
+  if grep -q 'RADCellSimulation subprocess finished' "$log_file"; then radcell_ok=1; fi
+  if grep -q 'Geant4 version Name:' "$log_file"; then geant4_ok=1; fi
+  if grep -q 'Now the processing event ID is:' "$log_file"; then events_ok=1; fi
+  if grep -q 'Cell Dose Information:' "$log_file"; then dose_ok=1; fi
+  if grep -q 'DNA Damage Information:' "$log_file"; then damage_ok=1; fi
+  if grep -q 'PERFORMANCE REPORT:' "$log_file"; then completed_ok=1; fi
 
-  if grep -Eq "CompuCell3D Version|XML is valid|INFO: Random number generator|INFO: Step|totalArea .*cell growth" "$log_file"; then
-    cc3d_ok=1
-  fi
-
-  if grep -Eq "\[RADCELL\] running|Start calling subprocess RADCellSimulation|the runMode is:|runMode:|Loaded cells:" "$log_file"; then
-    radcell_ok=1
-  fi
-
-  if grep -Eq "Geant4 version Name|G4DNASamplingTable|PhysicsList::SetCuts" "$log_file"; then
-    geant4_ok=1
-  fi
-
-  echo
-  echo "[RADCELL] smoke-test markers:"
-  echo "  CC3D:    $cc3d_ok"
-  echo "  RADCELL: $radcell_ok"
-  echo "  Geant4:  $geant4_ok"
-
-  if [[ "$cc3d_ok" -eq 1 && "$radcell_ok" -eq 1 && "$geant4_ok" -eq 1 ]]; then
-    echo "[RADCELL] full CC3D/RADCELL/Geant4 chain was reached."
-    return 0
-  fi
-
-  if [[ "$cc3d_ok" -eq 1 ]]; then
-    echo
-    echo "[RADCELL] CC3D started correctly."
-    echo "[RADCELL] RADCELL/Geant4 was not reached before timeout."
-    echo "[RADCELL] This is acceptable for a VascularTumor headless smoke test because radiation is triggered later in the CC3D run."
-    echo "[RADCELL] Increase --timeout if you specifically want to observe the RADCELL/Geant4 call."
-    return 0
+  if [[ "$INTEGRATION_TEST" -eq 1 ]]; then
+    local file
+    for file in "$TEST_MODEL_DIR/Simulation/"*cellNumber.csv; do
+      [[ -f "$file" ]] || continue
+      if [[ "$(wc -l < "$file")" -eq 20 ]]; then
+        records_ok=1
+        break
+      fi
+    done
   fi
 
   echo
-  echo "[ERROR] Smoke test did not reach CC3D initialization markers."
-  echo "[ERROR] See log: $log_file"
+  echo "[RADCELL] Validation markers:"
+  echo "  CC3D initialized:      $cc3d_ok"
+  echo "  CC3D run completed:    $completed_ok"
+  echo "  RADCELL returned:      $radcell_ok"
+  echo "  Geant4 initialized:    $geant4_ok"
+  echo "  Particle events:       $events_ok"
+  echo "  Cell dose:             $dose_ok"
+  echo "  DNA damage:            $damage_ok"
+  if [[ "$INTEGRATION_TEST" -eq 1 ]]; then
+    echo "  20 CC3D records:       $records_ok"
+    if [[ "$cc3d_ok" -eq 1 && "$completed_ok" -eq 1 && "$radcell_ok" -eq 1 &&
+          "$geant4_ok" -eq 1 && "$events_ok" -eq 1 && "$dose_ok" -eq 1 &&
+          "$damage_ok" -eq 1 && "$records_ok" -eq 1 ]]; then
+      echo "[PASS] Complete CC3D -> RADCELL -> Geant4 -> CC3D integration run."
+      return 0
+    fi
+    echo "[FAIL] Full integration test did not reach all markers." >&2
+    return 1
+  fi
+
+  if [[ "$cc3d_ok" -eq 1 && "$completed_ok" -eq 1 ]]; then
+    echo "[PASS] CC3D execution completed; radiation not required in startup mode."
+    return 0
+  fi
+  echo "[FAIL] CC3D did not reach a completed run." >&2
   return 1
 }
 
@@ -206,29 +248,24 @@ timeout "$TIMEOUT_SECONDS" "$LAUNCHER" -m cc3d.run_script \
   -i "$CC3D_FILE" \
   --output-dir "$RUN_DIR" \
   2>&1 | tee "$LOG_FILE"
-
-status=${PIPESTATUS[0]}
+status=$?
 set -e
 
 if [[ "$status" -eq 124 ]]; then
-  echo
-  echo "[RADCELL] timeout reached after ${TIMEOUT_SECONDS}s."
-  validate_smoke_log "$LOG_FILE"
-  echo
-  echo "[RADCELL] smoke test passed before timeout."
-  echo "[RADCELL] output dir: $RUN_DIR"
-  exit 0
+  echo "[TIMEOUT] Reached $TIMEOUT_SECONDS seconds; no successful completion." >&2
+  echo "[RADCELL] Log: $LOG_FILE"
+  exit 124
 fi
 
 if [[ "$status" -ne 0 ]]; then
-  echo
-  echo "[ERROR] Headless run failed with exit code $status."
-  echo "[ERROR] See log: $LOG_FILE"
+  echo "[FAIL] Headless command exited with status $status." >&2
+  echo "[RADCELL] Log: $LOG_FILE"
   exit "$status"
 fi
 
-validate_smoke_log "$LOG_FILE"
+if ! validate_smoke_log "$LOG_FILE"; then
+  echo "[RADCELL] Log: $LOG_FILE" >&2
+  exit 1
+fi
 
-echo
-echo "[RADCELL] headless run finished successfully."
 echo "[RADCELL] output dir: $RUN_DIR"
