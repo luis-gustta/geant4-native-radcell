@@ -313,56 +313,50 @@ This confirms that:
 
 ---
 
-## 9. Recommended headless CompuCell3D smoke test
+## 9. Headless smoke test and full integration test
 
-For SSH, tmux, or non-GUI runs, prefer the repository helper script:
-
-```bash
-mkdir -p ~/Desktop/simulacoes
-cd ~/Desktop/simulacoes
-
-/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
-  --radcell-dir "$RADCELL_ROOT" \
-  --launcher "$RADCELL_LAUNCHER"
-```
-
-By default, the script writes outputs under the directory where it was called:
-
-```text
-$PWD/radcell_runs/VascularTumor_cc3d_YYYY_MM_DD_HH_MM_SS_<id>/
-```
-
-Each run directory contains at least:
-
-```text
-VascularTumor.cc3d
-cc3d_headless.log
-run_manifest.json
-```
-
-This keeps simulation outputs out of the `geant4-native-radcell` repository and out of the RADCELL source tree.
-
-The script validates that CompuCell3D starts correctly. If the timeout is reached before the radiation step, the smoke test can still pass as long as CompuCell3D initialized successfully and no old Geant4 visualization/OpenGL error was found.
-
-If you specifically want to observe the RADCELL/Geant4 call from the full `VascularTumor` workflow, increase the timeout:
+**Startup/completion test** (does not require radiation, as the example may
+be configured for only 500 MCS while irradiation starts at MCS 12000):
 
 ```bash
+cd ~/simulacoes
 /path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
   --radcell-dir "$RADCELL_ROOT" \
   --launcher "$RADCELL_LAUNCHER" \
-  --timeout 300
+  --timeout 600
 ```
 
-Manual equivalent:
+A timeout is reported as **TIMEOUT** (nonzero exit), never as a successful
+test. A Python traceback is a failure even when the CC3D runner exits zero.
+
+**End-to-end integration test** (recommended after setup):
 
 ```bash
-"$RADCELL_LAUNCHER" -m cc3d.run_script \
-  -i "$RADCELL_ROOT/VascularTumor/VascularTumor.cc3d" \
-  --output-dir "$PWD/radcell_runs/VascularTumor_manual_test"
+cd ~/simulacoes
+/path/to/geant4-native-radcell/scripts/run_vasculartumor_headless.sh \
+  --radcell-dir "$RADCELL_ROOT" \
+  --launcher "$RADCELL_LAUNCHER" \
+  --integration-test \
+  --timeout 900
 ```
 
-If this command starts but never reaches RADCELL, check the radiation schedule. The simulation may not have reached the required MCS yet.
+This mode copies the model to a unique run directory, changes only its
+simulation duration to 20 MCS and the radiation trigger to MCS 10, and
+checks for a complete CC3D/RADCELL/Geant4/CC3D roundtrip. The original
+source tree is not modified. It checks Geant4 initialization, particle
+events, dose and DNA damage reports, RADCELL subprocess completion, and
+20 CC3D records. Runtime markers are operational checks, **not** a
+quantitative validation of dose, uncertainties, or biological response.
 
+The integration preparation uses syntax-aware matching to locate the
+radiation trigger. If the source layout has changed in an incompatible
+way, preparation fails rather than silently altering a different
+condition. Custom models can require their own integration fixture.
+
+Generated outputs and the isolated input copy are under
+`$PWD/radcell_runs/VascularTumor_cc3d_<timestamp>_<id>/`.
+Some custom models use their own absolute output paths; review those
+before running any test.
 
 ---
 
