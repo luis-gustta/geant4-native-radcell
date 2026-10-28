@@ -72,6 +72,14 @@ echo "  $PATCH_FILE"
 echo
 echo "[RADCELL] Checking patch status..."
 
+# An already compatible but customized source tree should not be overwritten.
+# This is useful for sites carrying local scientific-model modifications.
+if "$REPO_DIR/scripts/verify_radcell_compat.sh" "$RADCELL_DIR" >"$TMP_DIR/preverify.log" 2>&1; then
+  echo "[RADCELL] Existing tree passes compatibility verification."
+  echo "[RADCELL] Skipping patch; preserving local modifications."
+  exit 0
+fi
+
 # Case 1: patch can be applied normally.
 if patch --dry-run --batch --forward -p1 < "$PATCH_FILE" >"$DRY_LOG" 2>&1; then
   echo "[RADCELL] Patch can be applied."
