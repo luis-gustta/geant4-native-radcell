@@ -144,10 +144,11 @@ require_text "VascularTumor/Simulation/VascularTumorSteppables.py" \
   "getCellNeighborDataList(cell)" \
   "VascularTumorSteppables.py uses modern CC3D neighbor API"
 
-if grep -Eq "runMode[[:space:]]*=[[:space:]]*'out'[[:space:]]*\+[[:space:]]*' '[[:space:]]*\+[[:space:]]*self\.simulationID" "$RADCELL_DIR/VascularTumor/Simulation/VascularTumorSteppables.py" || grep -Fq "runMode = 'out'+' ' + self.simulationID" "$RADCELL_DIR/VascularTumor/Simulation/VascularTumorSteppables.py"; then
-  echo "OK: headless run mode"
+if python3 "$(dirname "${BASH_SOURCE[0]}")/verify_headless_runmode.py" \
+  "$RADCELL_DIR/VascularTumor/Simulation/VascularTumorSteppables.py"; then
+  :
 else
-  echo "FAIL: expected headless runMode construction"
+  echo "FAIL: expected a valid headless runMode assignment"
   failures=$((failures + 1))
 fi
 
