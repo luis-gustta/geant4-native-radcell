@@ -422,3 +422,39 @@ The installer, scripts, patches, and documentation in this repository are releas
 Geant4 itself is not authored by this project and remains subject to the Geant4 Software License and any dataset-specific terms. See `THIRD_PARTY_NOTICES.md`.
 
 RADCELL is not redistributed by this repository. Users should review the upstream RADCELL repository and its licensing status before redistributing modified RADCELL source code.
+
+## Cell-count output during a run
+
+The compatibility patch writes and flushes a row after each completed steppable
+step, rather than waiting for normal completion. The CSV keeps its existing
+five-column format without a header:
+
+```text
+MCS,tumor,vascular,neovascular,necrotic
+```
+
+Both normal completion and the Player Stop action close the file without
+rewriting or duplicating rows. Reopen the Player after updating Python source.
+This preserves completed rows after a manual stop; it does not recover data from
+an earlier run that never wrote its counts. Starting a new run still overwrites
+the same output filename, so archive results before rerunning. Flush makes rows
+visible to readers but does not guarantee persistence through a power failure.
+
+For an existing compatibility-patched checkout, rerun:
+
+```bash
+./scripts/apply_radcell_patch.sh /path/to/RADCELL
+```
+
+The helper also supports fresh installs and repeated application. The separate
+`patches/radcell_incremental_counts.patch` is the upgrade from the previous
+compatibility patch. No geometry, irradiation schedule, dose, or cell-death
+probability is changed by this update.
+
+Regression checks (Python 3.12+, Git, patch; no CC3D/Geant4 runtime required).
+The repository history must include baseline commit `2a45e3c` for the upgrade test
+(use a full clone or fetch that commit if working from a shallow checkout):
+
+```bash
+python3 tests/test_cell_count_recording.py /path/to/upstream/RADCELL
+```

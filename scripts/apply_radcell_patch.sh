@@ -107,6 +107,16 @@ if patch --dry-run --batch --reverse -p1 < "$PATCH_FILE" >"$REVERSE_LOG" 2>&1; t
   exit 0
 fi
 
+# Upgrade a tree that already has the previous compatibility patch.
+UPGRADE_PATCH="$REPO_DIR/patches/radcell_incremental_counts.patch"
+if [ -f "$UPGRADE_PATCH" ] &&
+   bash "$SCRIPT_DIR/verify_radcell_compat.sh" "$RADCELL_DIR" >"$TMP_DIR/verify.log" 2>&1 &&
+   patch --dry-run --batch --forward -p1 < "$UPGRADE_PATCH" >"$DRY_LOG" 2>&1; then
+  patch --batch --forward -p1 < "$UPGRADE_PATCH"
+  echo "[RADCELL] Incremental cell-count recording upgrade applied."
+  exit 0
+fi
+
 # Case 3: neither forward nor reverse worked.
 echo
 echo "ERROR: Patch cannot be applied and does not look already applied."
